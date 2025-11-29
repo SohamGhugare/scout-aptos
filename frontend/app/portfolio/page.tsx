@@ -14,12 +14,37 @@ export default function Portfolio() {
   const [balance, setBalance] = useState<string | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [username, setUsername] = useState('');
+  const [loadingUsername, setLoadingUsername] = useState(true);
 
   useEffect(() => {
     if (!connected) {
       router.push('/');
     }
   }, [connected, router]);
+
+  const fetchUsername = async () => {
+    if (account?.address) {
+      try {
+        setLoadingUsername(true);
+        const response = await fetch('/api/user/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ walletAddress: account.address.toString() }),
+        });
+
+        const data = await response.json();
+
+        if (data.exists) {
+          setUsername(data.username);
+        }
+      } catch (error) {
+        console.error('Error fetching username:', error);
+      } finally {
+        setLoadingUsername(false);
+      }
+    }
+  };
 
   const fetchBalance = async () => {
     if (account?.address) {
@@ -47,6 +72,7 @@ export default function Portfolio() {
 
   useEffect(() => {
     fetchBalance();
+    fetchUsername();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account]);
 
@@ -86,6 +112,18 @@ export default function Portfolio() {
 
           {/* Wallet Info Card */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-4 md:p-6 mb-4">
+            {/* Username */}
+            {username && (
+              <div className="mb-4">
+                <p className="text-gray-400 font-(family-name:--font-space-grotesk) text-xs md:text-sm mb-2">
+                  Username
+                </p>
+                <p className="text-green-400 font-(family-name:--font-space-grotesk) text-lg md:text-2xl font-bold">
+                  @{username}
+                </p>
+              </div>
+            )}
+
             {/* Address */}
             <div className="mb-4">
               <p className="text-gray-400 font-(family-name:--font-space-grotesk) text-xs md:text-sm mb-2">

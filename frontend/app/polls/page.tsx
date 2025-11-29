@@ -169,7 +169,6 @@ export default function PollsPage() {
             pollTime: Math.floor(Date.now() / 1000),
             expiryTime: Math.floor(expiresAt.getTime() / 1000),
             creator: account.address.toString(),
-            index: 0,
             transactionHash: response.hash,
             total_option1_stake: 0,
             total_option2_stake: 0,

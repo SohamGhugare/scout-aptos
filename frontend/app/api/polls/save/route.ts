@@ -17,14 +17,21 @@ export async function POST(request: NextRequest) {
     const db = client.db('scout-aptos');
     const pollsCollection = db.collection('polls');
 
+    // Get the count of existing polls by this creator to determine the next index
+    const existingPollsCount = await pollsCollection.countDocuments({
+      creator: pollData.creator,
+    });
+
     await pollsCollection.insertOne({
       ...pollData,
+      index: existingPollsCount, // Assign sequential index per creator
       createdAt: new Date(),
     });
 
     return NextResponse.json({
       success: true,
       message: 'Poll saved to database successfully',
+      index: existingPollsCount,
     });
   } catch (error) {
     console.error('Error saving poll:', error);

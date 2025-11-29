@@ -88,6 +88,14 @@ export default function Navbar() {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
+  const formatUsername = (username: string) => {
+    // Truncate username on mobile if longer than 10 characters
+    if (typeof window !== 'undefined' && window.innerWidth < 768 && username.length > 10) {
+      return `@${username.slice(0, 10)}...`;
+    }
+    return `@${username}`;
+  };
+
   return (
     <>
       <nav className="fixed top-3 md:top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-4xl px-2 md:px-4">
@@ -134,7 +142,10 @@ export default function Navbar() {
                     {isCheckingUser ? (
                       'Loading...'
                     ) : username ? (
-                      `@${username}`
+                      <>
+                        <span className="hidden md:inline">@{username}</span>
+                        <span className="inline md:hidden">{formatUsername(username)}</span>
+                      </>
                     ) : (
                       formatAddress(account?.address?.toString() || '')
                     )}

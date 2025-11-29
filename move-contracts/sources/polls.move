@@ -19,6 +19,16 @@ module test_addr::polls {
         creator: address,
         total_option1_stake: u64,
         total_option2_stake: u64,
+        is_finalized: bool,
+        winning_option: u8, // 0 = not set, 1 or 2 = winning option
+    }
+
+    struct PollVoters has key {
+        // Maps poll_index to list of voters
+        voters_option1: vector<vector<address>>,
+        voters_option2: vector<vector<address>>,
+        stakes_option1: vector<vector<u64>>,
+        stakes_option2: vector<vector<u64>>,
     }
 
     struct Vote has store, drop, copy {
@@ -60,11 +70,31 @@ module test_addr::polls {
         vote_time: u64,
     }
 
+    #[event]
+    struct PollFinalized has drop, store {
+        poll_creator: address,
+        poll_index: u64,
+        winning_option: u8,
+        total_pool: u64,
+        winners_count: u64,
+    }
+
+    #[event]
+    struct RewardDistributed has drop, store {
+        poll_creator: address,
+        poll_index: u64,
+        winner: address,
+        reward_amount: u64,
+    }
+
     const ENO_POLL_STORE: u64 = 0;
     const EPOLL_EXPIRED: u64 = 1;
     const EINVALID_OPTION: u64 = 2;
     const EALREADY_VOTED: u64 = 3;
     const EINSUFFICIENT_STAKE: u64 = 4;
+    const ENOT_POLL_CREATOR: u64 = 5;
+    const EPOLL_ALREADY_FINALIZED: u64 = 6;
+    const ENO_VOTES_FOR_OPTION: u64 = 7;
 
     public entry fun create_poll(
         account: signer,
@@ -75,7 +105,7 @@ module test_addr::polls {
         longitude: u64,
         poll_time: u64,
         expiry_time: u64,
-    ) acquires PollStore {
+    ) acquires PollStore, PollVoters {
         let account_addr = signer::address_of(&account);
 
         let poll = Poll {
@@ -89,6 +119,8 @@ module test_addr::polls {
             creator: account_addr,
             total_option1_stake: 0,
             total_option2_stake: 0,
+            is_finalized: false,
+            winning_option: 0,
         };
 
         if (!exists<PollStore>(account_addr)) {
@@ -97,8 +129,24 @@ module test_addr::polls {
             });
         };
 
+        if (!exists<PollVoters>(account_addr)) {
+            move_to(&account, PollVoters {
+                voters_option1: vector::empty(),
+                voters_option2: vector::empty(),
+                stakes_option1: vector::empty(),
+                stakes_option2: vector::empty(),
+            });
+        };
+
         let poll_store = borrow_global_mut<PollStore>(account_addr);
         vector::push_back(&mut poll_store.polls, poll);
+
+        // Initialize empty voter lists for this poll
+        let poll_voters = borrow_global_mut<PollVoters>(account_addr);
+        vector::push_back(&mut poll_voters.voters_option1, vector::empty());
+        vector::push_back(&mut poll_voters.voters_option2, vector::empty());
+        vector::push_back(&mut poll_voters.stakes_option1, vector::empty());
+        vector::push_back(&mut poll_voters.stakes_option2, vector::empty());
 
         event::emit(PollCreated {
             creator: account_addr,
@@ -149,7 +197,7 @@ module test_addr::polls {
         poll_index: u64,
         option: u8,
         stake_amount: u64,
-    ) acquires PollStore, VoteStore {
+    ) acquires PollStore, VoteStore, PollVoters {
         let voter_addr = signer::address_of(voter);
 
         // Validate option is 1 or 2
@@ -193,6 +241,20 @@ module test_addr::polls {
             poll_mut.total_option1_stake = poll_mut.total_option1_stake + stake_amount;
         } else {
             poll_mut.total_option2_stake = poll_mut.total_option2_stake + stake_amount;
+        };
+
+        // Track voter for reward distribution
+        let poll_voters = borrow_global_mut<PollVoters>(poll_creator);
+        if (option == 1) {
+            let voters = vector::borrow_mut(&mut poll_voters.voters_option1, poll_index);
+            vector::push_back(voters, voter_addr);
+            let stakes = vector::borrow_mut(&mut poll_voters.stakes_option1, poll_index);
+            vector::push_back(stakes, stake_amount);
+        } else {
+            let voters = vector::borrow_mut(&mut poll_voters.voters_option2, poll_index);
+            vector::push_back(voters, voter_addr);
+            let stakes = vector::borrow_mut(&mut poll_voters.stakes_option2, poll_index);
+            vector::push_back(stakes, stake_amount);
         };
 
         // Create vote record
@@ -252,4 +314,98 @@ module test_addr::polls {
             poll.total_option2_stake,
         )
     }
+
+    public entry fun finalize_poll_and_distribute(
+        host: &signer,
+        poll_index: u64,
+        winning_option: u8,
+    ) acquires PollStore, PollVoters {
+        let host_addr = signer::address_of(host);
+
+        // Validate winning option is 1 or 2
+        assert!(winning_option == 1 || winning_option == 2, error::invalid_argument(EINVALID_OPTION));
+
+        // Check poll exists
+        assert!(exists<PollStore>(host_addr), error::not_found(ENO_POLL_STORE));
+        let poll_store = borrow_global_mut<PollStore>(host_addr);
+        assert!(poll_index < vector::length(&poll_store.polls), error::not_found(ENO_POLL_STORE));
+
+        // Get poll and verify host is the creator
+        let poll = vector::borrow_mut(&mut poll_store.polls, poll_index);
+        assert!(poll.creator == host_addr, error::permission_denied(ENOT_POLL_CREATOR));
+
+        // Check poll is not already finalized
+        assert!(!poll.is_finalized, error::already_exists(EPOLL_ALREADY_FINALIZED));
+
+        // Mark poll as finalized
+        poll.is_finalized = true;
+        poll.winning_option = winning_option;
+
+        // Calculate total pool
+        let total_pool = poll.total_option1_stake + poll.total_option2_stake;
+
+        // Get winners based on winning option
+        let poll_voters = borrow_global<PollVoters>(host_addr);
+        let winners: &vector<address>;
+        let winner_stakes: &vector<u64>;
+
+        if (winning_option == 1) {
+            winners = vector::borrow(&poll_voters.voters_option1, poll_index);
+            winner_stakes = vector::borrow(&poll_voters.stakes_option1, poll_index);
+        } else {
+            winners = vector::borrow(&poll_voters.voters_option2, poll_index);
+            winner_stakes = vector::borrow(&poll_voters.stakes_option2, poll_index);
+        };
+
+        let winners_count = vector::length(winners);
+
+        // If no winners, host keeps all funds (already transferred to host during voting)
+        if (winners_count == 0) {
+            event::emit(PollFinalized {
+                poll_creator: host_addr,
+                poll_index,
+                winning_option,
+                total_pool,
+                winners_count: 0,
+            });
+            return
+        };
+
+        // Distribute rewards proportionally to each winner
+        let i = 0;
+        while (i < winners_count) {
+            let winner_addr = *vector::borrow(winners, i);
+            let winner_stake = *vector::borrow(winner_stakes, i);
+
+            // Calculate proportional reward: (winner_stake / total_winning_stake) * total_pool
+            let total_winning_stake = if (winning_option == 1) {
+                poll.total_option1_stake
+            } else {
+                poll.total_option2_stake
+            };
+
+            let reward = (winner_stake * total_pool) / total_winning_stake;
+
+            // Transfer reward from poll creator to winner
+            coin::transfer<AptosCoin>(host, winner_addr, reward);
+
+            event::emit(RewardDistributed {
+                poll_creator: host_addr,
+                poll_index,
+                winner: winner_addr,
+                reward_amount: reward,
+            });
+
+            i = i + 1;
+        };
+
+        event::emit(PollFinalized {
+            poll_creator: host_addr,
+            poll_index,
+            winning_option,
+            total_pool,
+            winners_count,
+        });
+    }
+
 }

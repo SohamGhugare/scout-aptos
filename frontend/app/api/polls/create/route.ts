@@ -1,60 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { Aptos, AptosConfig, Network } from '@aptos-labs/ts-sdk';
 
 export async function POST(request: NextRequest) {
   try {
-    const { walletAddress, title, options, location } = await request.json();
+    const { signedTransaction } = await request.json();
 
     // Validate input
-    if (!walletAddress || !title || !options || options.length !== 2) {
+    if (!signedTransaction) {
       return NextResponse.json(
-        { error: 'Wallet address, title, and exactly 2 options are required' },
+        { error: 'Signed transaction is required' },
         { status: 400 }
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db('data');
-    const users = db.collection('users');
-    const polls = db.collection('polls');
+    // Initialize Aptos client
+    const config = new AptosConfig({ network: Network.TESTNET });
+    const aptos = new Aptos(config);
 
-    // Get username from wallet address
-    const user = await users.findOne({ walletAddress });
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found. Please create a username first.' },
-        { status: 404 }
-      );
-    }
+    // Submit the signed transaction
+    const committedTxn = await aptos.transaction.submit.simple(signedTransaction);
 
-    // Create poll document
-    const poll = {
-      title: title.trim(),
-      options: options.map((opt: string, index: number) => ({
-        id: index,
-        text: opt.trim(),
-        votes: 0,
-        voters: [] as string[], // Array of wallet addresses who voted for this option
-      })),
-      createdBy: {
-        walletAddress,
-        username: user.username,
-      },
-      location: location ? {
-        latitude: location.latitude,
-        longitude: location.longitude,
-      } : null,
-      totalVotes: 0,
-      createdAt: new Date(),
-      status: 'active', // active, closed
-    };
-
-    const result = await polls.insertOne(poll);
+    // Wait for transaction to be processed
+    await aptos.waitForTransaction({
+      transactionHash: committedTxn.hash,
+    });
 
     return NextResponse.json({
       success: true,
-      pollId: result.insertedId,
-      message: 'Poll created successfully',
+      transactionHash: committedTxn.hash,
+      message: 'Poll created successfully on blockchain',
     });
   } catch (error) {
     console.error('Error creating poll:', error);

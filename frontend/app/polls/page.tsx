@@ -4,17 +4,22 @@ import Navbar from "@/components/Navbar";
 import LocationPolls from "@/components/LocationPolls";
 import { useState } from "react";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import { X, CheckCircle } from "lucide-react";
+import { X, CheckCircle, ExternalLink } from "lucide-react";
 
 export default function PollsPage() {
-  const { connected, account } = useWallet();
+  const { connected, account, signAndSubmitTransaction } = useWallet();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [pollTitle, setPollTitle] = useState('');
   const [option1, setOption1] = useState('');
   const [option2, setOption2] = useState('');
+  const [minutes, setMinutes] = useState('');
+  const [hours, setHours] = useState('');
+  const [days, setDays] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<'uploading' | 'success'>('uploading');
+  const [transactionHash, setTransactionHash] = useState('');
 
   const handleCreatePoll = async () => {
     if (!connected || !account?.address) {
@@ -27,9 +32,26 @@ export default function PollsPage() {
       return;
     }
 
+    // Validate expiry time - at least one field must be filled
+    const mins = parseInt(minutes) || 0;
+    const hrs = parseInt(hours) || 0;
+    const dys = parseInt(days) || 0;
+
+    if (mins === 0 && hrs === 0 && dys === 0) {
+      setError('Please set an expiry time for the poll');
+      return;
+    }
+
+    // Calculate expiry timestamp
+    const totalMilliseconds = (mins * 60 * 1000) + (hrs * 60 * 60 * 1000) + (dys * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + totalMilliseconds);
+
     try {
       setIsSubmitting(true);
       setError('');
+      setShowCreateModal(false);
+      setShowUploadDialog(true);
+      setUploadStatus('uploading');
 
       // Get user's current location
       let location = null;
@@ -53,37 +75,50 @@ export default function PollsPage() {
         }
       }
 
-      const response = await fetch('/api/polls/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletAddress: account.address.toString(),
-          title: pollTitle.trim(),
-          options: [option1.trim(), option2.trim()],
-          location,
-        }),
+      // Convert coordinates to unsigned integers by adding offset
+      // Latitude range: -90 to +90, offset by 90 -> 0 to 180
+      // Longitude range: -180 to +180, offset by 180 -> 0 to 360
+      const latitudeU64 = location
+        ? Math.floor((location.latitude + 90) * 1000000)
+        : 90000000; // Default to equator (0 + 90 offset)
+
+      const longitudeU64 = location
+        ? Math.floor((location.longitude + 180) * 1000000)
+        : 180000000; // Default to prime meridian (0 + 180 offset)
+
+      // Sign and submit transaction
+      const response = await signAndSubmitTransaction({
+        sender: account.address,
+        data: {
+          function: `${process.env.NEXT_PUBLIC_MODULE_ADDRESS}::polls::create_poll`,
+          typeArguments: [],
+          functionArguments: [
+            pollTitle.trim(),
+            option1.trim(),
+            option2.trim(),
+            latitudeU64,  // u64: (latitude + 90) * 1000000
+            longitudeU64, // u64: (longitude + 180) * 1000000
+            Math.floor(Date.now() / 1000), // Created at timestamp (current time in seconds)
+            Math.floor(expiresAt.getTime() / 1000), // Expires at timestamp (future time in seconds)
+          ],
+        },
       });
 
-      const data = await response.json();
+      // Set transaction hash and update status
+      setTransactionHash(response.hash);
+      setUploadStatus('success');
 
-      if (response.ok) {
-        // Reset form and close modal
-        setPollTitle('');
-        setOption1('');
-        setOption2('');
-        setShowCreateModal(false);
-
-        // Show success toast
-        setShowSuccessToast(true);
-        setTimeout(() => setShowSuccessToast(false), 3000);
-
-        // TODO: Refresh polls list
-      } else {
-        setError(data.error || 'Failed to create poll');
-      }
+      // Reset form
+      setPollTitle('');
+      setOption1('');
+      setOption2('');
+      setMinutes('');
+      setHours('');
+      setDays('');
     } catch (error) {
       console.error('Error creating poll:', error);
       setError('Failed to create poll');
+      setShowUploadDialog(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -160,6 +195,48 @@ export default function PollsPage() {
                 />
               </div>
 
+              {/* Expiry Time */}
+              <div>
+                <label className="text-white font-medium font-(family-name:--font-space-grotesk) text-sm mb-2 block">
+                  Expiry Time
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <input
+                      type="number"
+                      value={minutes}
+                      onChange={(e) => setMinutes(e.target.value)}
+                      placeholder="Minutes"
+                      min="0"
+                      className="w-full px-3 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 transition-colors font-(family-name:--font-space-grotesk) text-center"
+                    />
+                    <p className="text-xs text-gray-400 text-center mt-1 font-(family-name:--font-space-grotesk)">Minutes</p>
+                  </div>
+                  <div>
+                    <input
+                      type="number"
+                      value={hours}
+                      onChange={(e) => setHours(e.target.value)}
+                      placeholder="Hours"
+                      min="0"
+                      className="w-full px-3 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 transition-colors font-(family-name:--font-space-grotesk) text-center"
+                    />
+                    <p className="text-xs text-gray-400 text-center mt-1 font-(family-name:--font-space-grotesk)">Hours</p>
+                  </div>
+                  <div>
+                    <input
+                      type="number"
+                      value={days}
+                      onChange={(e) => setDays(e.target.value)}
+                      placeholder="Days"
+                      min="0"
+                      className="w-full px-3 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 transition-colors font-(family-name:--font-space-grotesk) text-center"
+                    />
+                    <p className="text-xs text-gray-400 text-center mt-1 font-(family-name:--font-space-grotesk)">Days</p>
+                  </div>
+                </div>
+              </div>
+
               {/* Error Message */}
               {error && (
                 <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
@@ -182,15 +259,58 @@ export default function PollsPage() {
         </div>
       )}
 
-      {/* Success Toast */}
-      {showSuccessToast && (
-        <div className="fixed bottom-6 right-6 z-100 animate-in slide-in-from-bottom-5 fade-in duration-300">
-          <div className="bg-green-500/20 border border-green-500/50 rounded-2xl p-4 backdrop-blur-md shadow-lg">
-            <div className="flex items-center gap-3">
-              <CheckCircle className="w-5 h-5 text-green-400" />
-              <p className="text-white font-(family-name:--font-space-grotesk) font-medium">
-                Poll created successfully!
-              </p>
+      {/* Upload Dialog */}
+      {showUploadDialog && (
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-black/90 border border-green-500/30 rounded-2xl p-8 w-full max-w-md text-center">
+            <h2 className="text-3xl font-bold text-white font-(family-name:--font-space-grotesk) mb-6">
+              {uploadStatus === 'uploading' ? 'Brewing...' : 'You did it!'}
+            </h2>
+
+            <div className="space-y-6">
+              {uploadStatus === 'uploading' ? (
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-12 h-12 border-4 border-green-500/30 border-t-green-500 rounded-full animate-spin"></div>
+                  <p className="text-gray-300 font-(family-name:--font-space-grotesk) text-lg">
+                    Uploading...
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-4">
+                  <CheckCircle className="w-16 h-16 text-green-400" />
+                  <p className="text-green-400 font-(family-name:--font-space-grotesk) text-lg font-semibold">
+                    Uploaded Successfully
+                  </p>
+                  {transactionHash && (
+                    <div className="space-y-2">
+                      <p className="text-gray-400 font-(family-name:--font-space-grotesk) text-sm">
+                        Transaction Hash
+                      </p>
+                      <p className="text-white font-(family-name:--font-space-grotesk) text-sm font-mono bg-white/5 px-4 py-2 rounded-lg break-all">
+                        {transactionHash.slice(0, 20)}...{transactionHash.slice(-20)}
+                      </p>
+                      <a
+                        href={`https://explorer.aptoslabs.com/txn/${transactionHash}?network=testnet`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 text-green-400 hover:text-green-300 font-(family-name:--font-space-grotesk) transition-colors underline"
+                      >
+                        <span>View Transaction</span>
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => {
+                      setShowUploadDialog(false);
+                      setTransactionHash('');
+                    }}
+                    className="mt-4 bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-black font-semibold px-8 py-3 rounded-full transition-all font-(family-name:--font-space-grotesk)"
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

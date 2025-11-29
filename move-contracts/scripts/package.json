@@ -1,0 +1,19 @@
+{
+  "name": "aptos-poll-scripts",
+  "version": "1.0.0",
+  "description": "Scripts to interact with Aptos polls smart contract",
+  "type": "module",
+  "scripts": {
+    "create-poll": "ts-node create_poll.ts",
+    "fetch-polls": "ts-node fetch_all_polls.ts"
+  },
+  "dependencies": {
+    "@aptos-labs/ts-sdk": "^1.31.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  }
+}

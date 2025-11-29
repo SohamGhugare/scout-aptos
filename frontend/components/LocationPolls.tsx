@@ -3,15 +3,41 @@
 import { useEffect, useState } from 'react';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import { Plus } from 'lucide-react';
+import { calculateDistance } from '@/lib/utils';
 
 interface LocationPollsProps {
   onCreateClick?: () => void;
+}
+
+interface Poll {
+  _id: string;
+  title: string;
+  options: Array<{
+    id: number;
+    text: string;
+    votes: number;
+    voters: string[];
+  }>;
+  createdBy: {
+    walletAddress: string;
+    username: string;
+  };
+  location: {
+    latitude: number;
+    longitude: number;
+  } | null;
+  totalVotes: number;
+  createdAt: string;
+  status: string;
 }
 
 export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
   const { connected } = useWallet();
   const [location, setLocation] = useState<string>('your location');
   const [loading, setLoading] = useState(true);
+  const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [nearbyPolls, setNearbyPolls] = useState<Poll[]>([]);
+  const [pollsLoading, setPollsLoading] = useState(true);
 
   useEffect(() => {
     const getLocation = async () => {
@@ -35,6 +61,9 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
 
             try {
               const { latitude, longitude } = position.coords;
+
+              // Store user coordinates
+              setUserCoords({ latitude, longitude });
 
               // Use reverse geocoding to get location name
               const response = await fetch(
@@ -93,15 +122,62 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
     getLocation();
   }, []);
 
+  // Fetch and filter nearby polls
+  useEffect(() => {
+    const fetchNearbyPolls = async () => {
+      if (!userCoords) {
+        setPollsLoading(false);
+        return;
+      }
+
+      try {
+        setPollsLoading(true);
+        const response = await fetch('/api/polls/list');
+        const data = await response.json();
+
+        if (data.success && data.polls) {
+          // Filter polls within 100m radius
+          const filtered = data.polls.filter((poll: Poll) => {
+            if (!poll.location) return false;
+
+            const distance = calculateDistance(
+              userCoords.latitude,
+              userCoords.longitude,
+              poll.location.latitude,
+              poll.location.longitude
+            );
+
+            return distance <= 100; // 100 meters
+          });
+
+          setNearbyPolls(filtered);
+        }
+      } catch (error) {
+        console.error('Error fetching polls:', error);
+      } finally {
+        setPollsLoading(false);
+      }
+    };
+
+    fetchNearbyPolls();
+  }, [userCoords]);
+
   return (
     <div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold font-(family-name:--font-space-grotesk) text-white">
-          {loading ? (
+          {loading || pollsLoading ? (
             <span className="text-gray-400">Finding polls near you...</span>
+          ) : nearbyPolls.length === 0 ? (
+            <span className="text-white">
+              No polls found.{' '}
+              <span className="bg-linear-to-r from-green-400 to-green-500 bg-clip-text text-transparent">
+                Be the first one to create
+              </span>
+            </span>
           ) : (
             <>
-              <span className="text-white">10 polls found around </span>
+              <span className="text-white">{nearbyPolls.length} {nearbyPolls.length === 1 ? 'poll' : 'polls'} found around </span>
               <span className="bg-linear-to-r from-green-400 to-green-500 bg-clip-text text-transparent">
                 {location}
               </span>

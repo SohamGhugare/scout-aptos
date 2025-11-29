@@ -11,6 +11,14 @@ export default function Hero() {
       <div className="absolute -bottom-32 -right-32 w-[700px] h-[700px] bg-emerald-500/20 rounded-full blur-[150px] animate-[float-slower_25s_ease-in-out_infinite]"></div>
 
       <div className="relative z-10">
+        {/* Powered by Aptos Badge */}
+        <div className="relative inline-flex items-center gap-2 px-6 py-3 bg-black/70 backdrop-blur-md border border-green-500/40 rounded-full mb-10 shadow-[0_0_30px_rgba(34,197,94,0.2)]">
+          <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-full blur-sm"></div>
+          <span className="relative text-base font-medium text-gray-200 font-[family-name:var(--font-space-grotesk)]">
+            Powered by <span className="text-green-400 font-bold">Aptos</span>
+          </span>
+        </div>
+
         <h1 className="text-5xl md:text-6xl lg:text-8xl font-bold mb-8 font-[family-name:var(--font-space-grotesk)] leading-tight">
           <span className="block text-white mb-2">Bet on Vibes</span>
           <span className="block bg-gradient-to-r from-green-400 via-emerald-500 to-green-600 bg-clip-text text-transparent">

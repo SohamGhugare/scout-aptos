@@ -21,6 +21,11 @@ interface Poll {
   index: number;
   total_option1_stake?: number;
   total_option2_stake?: number;
+  userVote?: {
+    hasVoted: boolean;
+    stakeAmount?: number;
+    option?: number;
+  };
 }
 
 export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
@@ -34,6 +39,9 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
   const [stakeAmount, setStakeAmount] = useState('');
   const [showVoteModal, setShowVoteModal] = useState(false);
   const [isVoting, setIsVoting] = useState(false);
+  const [voteStatus, setVoteStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [voteError, setVoteError] = useState('');
+  const [voteTransactionHash, setVoteTransactionHash] = useState('');
 
   useEffect(() => {
     const getLocation = async () => {
@@ -154,7 +162,35 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
             return distance <= 100 && isActive;
           });
 
-          setNearbyPolls(filtered);
+          // Check if user has voted on each poll
+          if (connected && account) {
+            const pollsWithVotes = await Promise.all(
+              filtered.map(async (poll: Poll) => {
+                try {
+                  const voteResponse = await fetch('/api/votes/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      voter: account.address.toString(),
+                      pollCreator: poll.creator,
+                      pollIndex: poll.index,
+                    }),
+                  });
+                  const voteData = await voteResponse.json();
+                  return {
+                    ...poll,
+                    userVote: voteData.hasVoted ? voteData : { hasVoted: false },
+                  };
+                } catch (error) {
+                  console.error('Error checking vote:', error);
+                  return { ...poll, userVote: { hasVoted: false } };
+                }
+              })
+            );
+            setNearbyPolls(pollsWithVotes);
+          } else {
+            setNearbyPolls(filtered);
+          }
         }
       } catch (error) {
         console.error('Error fetching polls:', error);
@@ -164,7 +200,7 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
     };
 
     fetchNearbyPolls();
-  }, [userCoords]);
+  }, [userCoords, connected, account]);
 
   const formatTimeRemaining = (expiryTime: number) => {
     const now = Math.floor(Date.now() / 1000);
@@ -200,6 +236,9 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
 
     setVotingPoll({ creator: poll.creator, index: poll.index, option });
     setShowVoteModal(true);
+    setVoteStatus('idle');
+    setVoteError('');
+    setVoteTransactionHash('');
   };
 
   const handleVoteSubmit = async () => {
@@ -207,12 +246,15 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
 
     const stake = parseFloat(stakeAmount);
     if (isNaN(stake) || stake <= 0) {
-      alert('Please enter a valid stake amount');
+      setVoteStatus('error');
+      setVoteError('Please enter a valid stake amount');
       return;
     }
 
     try {
       setIsVoting(true);
+      setVoteStatus('submitting');
+      setVoteError('');
 
       // Convert APT to Octas (1 APT = 100,000,000 Octas)
       const stakeInOctas = Math.floor(stake * 100000000);
@@ -230,6 +272,8 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
           ],
         },
       });
+
+      setVoteTransactionHash(response.hash);
 
       // Save vote to MongoDB
       try {
@@ -249,17 +293,16 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
         console.error('Error saving vote to database:', dbError);
       }
 
-      // Reset and close modal
-      setShowVoteModal(false);
-      setStakeAmount('');
-      setVotingPoll(null);
+      setVoteStatus('success');
 
-      // Refresh polls to update stakes
-      window.location.reload();
-      alert('Vote submitted successfully!');
+      // Refresh polls after short delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (error) {
       console.error('Error voting:', error);
-      alert('Failed to submit vote');
+      setVoteStatus('error');
+      setVoteError(error instanceof Error ? error.message : 'Failed to submit vote');
     } finally {
       setIsVoting(false);
     }
@@ -322,28 +365,44 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
                     const option1Stake = poll.total_option1_stake || 0;
                     const option2Stake = poll.total_option2_stake || 0;
                     const totalStake = option1Stake + option2Stake;
-                    const option1Percent = totalStake > 0 ? Math.round((option1Stake / totalStake) * 100) : 50;
-                    const option2Percent = totalStake > 0 ? 100 - option1Percent : 50;
+                    const option1Percent = totalStake > 0 ? Math.round((option1Stake / totalStake) * 100) : 0;
+                    const option2Percent = totalStake > 0 ? 100 - option1Percent : 0;
+
+                    // Convert octas to APT for display (1 APT = 100,000,000 Octas)
+                    const option1APT = (option1Stake / 100000000).toFixed(2);
+                    const option2APT = (option2Stake / 100000000).toFixed(2);
 
                     return (
                       <>
                         <div className="flex h-3 rounded-full overflow-hidden shadow-lg mb-3 bg-black/30">
-                          <div
-                            className="bg-linear-to-r from-green-400 to-green-500 transition-all duration-500 ease-out"
-                            style={{ width: `${option1Percent}%` }}
-                          />
-                          <div
-                            className="bg-linear-to-r from-red-500 to-red-400 transition-all duration-500 ease-out"
-                            style={{ width: `${option2Percent}%` }}
-                          />
+                          {totalStake > 0 ? (
+                            <>
+                              <div
+                                className="bg-linear-to-r from-green-400 to-green-500 transition-all duration-500 ease-out"
+                                style={{ width: `${option1Percent}%` }}
+                              />
+                              <div
+                                className="bg-linear-to-r from-red-500 to-red-400 transition-all duration-500 ease-out"
+                                style={{ width: `${option2Percent}%` }}
+                              />
+                            </>
+                          ) : (
+                            <div className="w-full h-full bg-gray-700/50" />
+                          )}
                         </div>
                         <div className="flex justify-between items-center">
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-linear-to-r from-green-400 to-green-500 shadow-md shadow-green-500/50" />
-                            <span className="text-green-400 font-bold text-lg font-(family-name:--font-space-grotesk)">{option1Percent}%</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-green-400 font-bold text-lg font-(family-name:--font-space-grotesk)">{option1Percent}%</span>
+                              <span className="text-gray-500 text-xs font-(family-name:--font-space-grotesk)">({option1APT} APT)</span>
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-red-400 font-bold text-lg font-(family-name:--font-space-grotesk)">{option2Percent}%</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-gray-500 text-xs font-(family-name:--font-space-grotesk)">({option2APT} APT)</span>
+                              <span className="text-red-400 font-bold text-lg font-(family-name:--font-space-grotesk)">{option2Percent}%</span>
+                            </div>
                             <div className="w-3 h-3 rounded-full bg-linear-to-r from-red-500 to-red-400 shadow-md shadow-red-500/50" />
                           </div>
                         </div>
@@ -354,20 +413,50 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
 
                 {/* Option Buttons */}
                 <div className="space-y-3 mb-5">
-                  <button
-                    onClick={() => handleVoteClick(poll, 1)}
-                    disabled={!connected || poll.creator === account?.address.toString()}
-                    className="w-full bg-linear-to-r from-green-500/20 to-green-600/20 hover:from-green-500/30 hover:to-green-600/30 border-2 border-green-500/50 hover:border-green-400/70 text-white font-semibold py-3.5 px-4 rounded-2xl transition-all duration-200 font-(family-name:--font-space-grotesk) shadow-lg shadow-green-500/10 hover:shadow-green-500/20 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  >
-                    {poll.option1}
-                  </button>
-                  <button
-                    onClick={() => handleVoteClick(poll, 2)}
-                    disabled={!connected || poll.creator === account?.address.toString()}
-                    className="w-full bg-linear-to-r from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30 border-2 border-red-500/50 hover:border-red-400/70 text-white font-semibold py-3.5 px-4 rounded-2xl transition-all duration-200 font-(family-name:--font-space-grotesk) shadow-lg shadow-red-500/10 hover:shadow-red-500/20 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  >
-                    {poll.option2}
-                  </button>
+                  <div className="relative group/button">
+                    <button
+                      onClick={() => handleVoteClick(poll, 1)}
+                      disabled={!connected || poll.creator === account?.address.toString() || poll.userVote?.hasVoted}
+                      className="w-full bg-linear-to-r from-green-500/20 to-green-600/20 hover:from-green-500/30 hover:to-green-600/30 border-2 border-green-500/50 hover:border-green-400/70 text-white font-semibold py-3.5 px-4 rounded-2xl transition-all duration-200 font-(family-name:--font-space-grotesk) shadow-lg shadow-green-500/10 hover:shadow-green-500/20 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    >
+                      {poll.option1}
+                    </button>
+                    {(poll.creator === account?.address.toString() || poll.userVote?.hasVoted) && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-black/90 border border-white/20 rounded-lg opacity-0 group-hover/button:opacity-100 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-10">
+                        <p className="text-white text-xs font-(family-name:--font-space-grotesk)">
+                          {poll.creator === account?.address.toString()
+                            ? "You own this poll"
+                            : poll.userVote?.stakeAmount
+                              ? `Already staked ${(poll.userVote.stakeAmount / 100000000).toFixed(2)} APT`
+                              : "Already voted"
+                          }
+                        </p>
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-black/90"></div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative group/button">
+                    <button
+                      onClick={() => handleVoteClick(poll, 2)}
+                      disabled={!connected || poll.creator === account?.address.toString() || poll.userVote?.hasVoted}
+                      className="w-full bg-linear-to-r from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30 border-2 border-red-500/50 hover:border-red-400/70 text-white font-semibold py-3.5 px-4 rounded-2xl transition-all duration-200 font-(family-name:--font-space-grotesk) shadow-lg shadow-red-500/10 hover:shadow-red-500/20 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    >
+                      {poll.option2}
+                    </button>
+                    {(poll.creator === account?.address.toString() || poll.userVote?.hasVoted) && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-black/90 border border-white/20 rounded-lg opacity-0 group-hover/button:opacity-100 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-10">
+                        <p className="text-white text-xs font-(family-name:--font-space-grotesk)">
+                          {poll.creator === account?.address.toString()
+                            ? "You own this poll"
+                            : poll.userVote?.stakeAmount
+                              ? `Already staked ${(poll.userVote.stakeAmount / 100000000).toFixed(2)} APT`
+                              : "Already voted"
+                          }
+                        </p>
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-black/90"></div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Footer: Created by and Expires */}
@@ -393,63 +482,128 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
       {showVoteModal && votingPoll && (
         <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-black/90 border border-green-500/30 rounded-2xl p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-white font-(family-name:--font-space-grotesk)">
-                Place Your Vote
-              </h2>
-              <button
-                onClick={() => {
-                  setShowVoteModal(false);
-                  setStakeAmount('');
-                  setVotingPoll(null);
-                }}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+            {voteStatus === 'idle' || voteStatus === 'error' ? (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold text-white font-(family-name:--font-space-grotesk)">
+                    Place Your Vote
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setShowVoteModal(false);
+                      setStakeAmount('');
+                      setVotingPoll(null);
+                      setVoteStatus('idle');
+                      setVoteError('');
+                    }}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
 
-            <div className="space-y-4">
-              <div>
-                <p className="text-gray-400 text-sm font-(family-name:--font-space-grotesk) mb-2">
-                  Voting for Option {votingPoll.option}
-                </p>
-                <p className="text-green-400 font-semibold text-lg font-(family-name:--font-space-grotesk)">
-                  {votingPoll.option === 1
-                    ? nearbyPolls.find(p => p.creator === votingPoll.creator && p.index === votingPoll.index)?.option1
-                    : nearbyPolls.find(p => p.creator === votingPoll.creator && p.index === votingPoll.index)?.option2
-                  }
-                </p>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-gray-400 text-sm font-(family-name:--font-space-grotesk) mb-2">
+                      Voting for Option {votingPoll.option}
+                    </p>
+                    <p className="text-green-400 font-semibold text-lg font-(family-name:--font-space-grotesk)">
+                      {votingPoll.option === 1
+                        ? nearbyPolls.find(p => p.creator === votingPoll.creator && p.index === votingPoll.index)?.option1
+                        : nearbyPolls.find(p => p.creator === votingPoll.creator && p.index === votingPoll.index)?.option2
+                      }
+                    </p>
+                  </div>
+
+                  {voteStatus === 'error' && voteError && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                      <p className="text-red-400 text-sm font-(family-name:--font-space-grotesk)">
+                        {voteError}
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-white font-medium font-(family-name:--font-space-grotesk) text-sm mb-2 block">
+                      Stake Amount (APT)
+                    </label>
+                    <input
+                      type="number"
+                      value={stakeAmount}
+                      onChange={(e) => setStakeAmount(e.target.value)}
+                      placeholder="0.1"
+                      min="0"
+                      step="0.01"
+                      disabled={isVoting}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 transition-colors font-(family-name:--font-space-grotesk) disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                    <p className="text-xs text-gray-400 mt-1 font-(family-name:--font-space-grotesk)">
+                      Minimum: 0.01 APT
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleVoteSubmit}
+                    disabled={isVoting || !stakeAmount || parseFloat(stakeAmount) <= 0}
+                    className="w-full bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-black font-semibold px-6 py-3 rounded-full transition-all font-(family-name:--font-space-grotesk)"
+                  >
+                    Submit Vote
+                  </button>
+                </div>
+              </>
+            ) : voteStatus === 'submitting' ? (
+              <div className="text-center py-8">
+                <h2 className="text-3xl font-bold text-white font-(family-name:--font-space-grotesk) mb-6">
+                  Submitting Vote...
+                </h2>
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-12 h-12 border-4 border-green-500/30 border-t-green-500 rounded-full animate-spin"></div>
+                  <p className="text-gray-300 font-(family-name:--font-space-grotesk) text-lg">
+                    Processing your vote on the blockchain
+                  </p>
+                </div>
               </div>
-
-              <div>
-                <label className="text-white font-medium font-(family-name:--font-space-grotesk) text-sm mb-2 block">
-                  Stake Amount (APT)
-                </label>
-                <input
-                  type="number"
-                  value={stakeAmount}
-                  onChange={(e) => setStakeAmount(e.target.value)}
-                  placeholder="0.1"
-                  min="0"
-                  step="0.01"
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 transition-colors font-(family-name:--font-space-grotesk)"
-                />
-                <p className="text-xs text-gray-400 mt-1 font-(family-name:--font-space-grotesk)">
-                  Minimum: 0.01 APT
-                </p>
+            ) : (
+              <div className="text-center py-8">
+                <h2 className="text-3xl font-bold text-white font-(family-name:--font-space-grotesk) mb-6">
+                  Vote Submitted!
+                </h2>
+                <div className="flex flex-col items-center gap-4">
+                  <svg className="w-16 h-16 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-green-400 font-(family-name:--font-space-grotesk) text-lg font-semibold">
+                    Your vote has been recorded successfully
+                  </p>
+                  {voteTransactionHash && (
+                    <div className="space-y-2 mt-2">
+                      <p className="text-gray-400 font-(family-name:--font-space-grotesk) text-sm">
+                        Transaction Hash
+                      </p>
+                      <p className="text-white font-(family-name:--font-space-grotesk) text-sm font-mono bg-white/5 px-4 py-2 rounded-lg break-all">
+                        {voteTransactionHash.slice(0, 20)}...{voteTransactionHash.slice(-20)}
+                      </p>
+                      <a
+                        href={`https://explorer.aptoslabs.com/txn/${voteTransactionHash}?network=testnet`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 text-green-400 hover:text-green-300 font-(family-name:--font-space-grotesk) transition-colors underline text-sm"
+                      >
+                        <span>View Transaction</span>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    </div>
+                  )}
+                  <p className="text-gray-400 text-sm font-(family-name:--font-space-grotesk) mt-4">
+                    Refreshing polls...
+                  </p>
+                </div>
               </div>
-
-              <button
-                onClick={handleVoteSubmit}
-                disabled={isVoting || !stakeAmount || parseFloat(stakeAmount) <= 0}
-                className="w-full bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-black font-semibold px-6 py-3 rounded-full transition-all font-(family-name:--font-space-grotesk)"
-              >
-                {isVoting ? 'Submitting Vote...' : 'Submit Vote'}
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}

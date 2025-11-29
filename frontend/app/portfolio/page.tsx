@@ -4,7 +4,7 @@ import Navbar from '@/components/Navbar';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Copy, Check, RefreshCw, Trophy, Coins, ExternalLink } from 'lucide-react';
+import { Copy, Check, RefreshCw, Trophy, Coins, ExternalLink, Droplet } from 'lucide-react';
 import { Aptos, AptosConfig, Network } from '@aptos-labs/ts-sdk';
 
 export default function Portfolio() {
@@ -18,6 +18,8 @@ export default function Portfolio() {
   const [loadingUsername, setLoadingUsername] = useState(true);
   const [portfolioData, setPortfolioData] = useState<any>(null);
   const [loadingPortfolio, setLoadingPortfolio] = useState(true);
+  const [requestingFaucet, setRequestingFaucet] = useState(false);
+  const [faucetMessage, setFaucetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     if (!connected) {
@@ -129,6 +131,46 @@ export default function Portfolio() {
       : address;
   };
 
+  const handleRequestFaucet = async () => {
+    if (!account?.address) return;
+
+    try {
+      setRequestingFaucet(true);
+      setFaucetMessage(null);
+
+      const response = await fetch('/api/faucet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipientAddress: account.address.toString() }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setFaucetMessage({
+          type: 'success',
+          text: `Successfully received ${data.amountInAPT} APT! Transaction: ${data.transactionHash.slice(0, 8)}...`,
+        });
+        // Refresh balance after successful faucet request
+        setTimeout(() => fetchBalance(), 2000);
+      } else {
+        setFaucetMessage({
+          type: 'error',
+          text: data.error || 'Failed to request faucet',
+        });
+      }
+    } catch (error) {
+      setFaucetMessage({
+        type: 'error',
+        text: 'Failed to request faucet. Please try again.',
+      });
+    } finally {
+      setRequestingFaucet(false);
+      // Clear message after 5 seconds
+      setTimeout(() => setFaucetMessage(null), 5000);
+    }
+  };
+
   if (!connected) {
     return null;
   }
@@ -210,13 +252,45 @@ export default function Portfolio() {
             </div>
           </div>
 
-          {/* Disconnect Button */}
-          <button
-            onClick={handleDisconnect}
-            className="w-full md:w-auto px-6 py-2.5 md:py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 rounded-full transition-all font-(family-name:--font-space-grotesk) font-medium text-sm md:text-base"
-          >
-            Disconnect Wallet
-          </button>
+          {/* Faucet Message */}
+          {faucetMessage && (
+            <div
+              className={`mb-4 p-3 rounded-xl border ${
+                faucetMessage.type === 'success'
+                  ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                  : 'bg-red-500/10 border-red-500/30 text-red-400'
+              } font-(family-name:--font-space-grotesk) text-sm`}
+            >
+              {faucetMessage.text}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex flex-col md:flex-row gap-3">
+            <button
+              onClick={handleRequestFaucet}
+              disabled={requestingFaucet}
+              className="flex-1 md:flex-none px-6 py-2.5 md:py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/40 rounded-full transition-all font-(family-name:--font-space-grotesk) font-medium text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {requestingFaucet ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                  Requesting...
+                </>
+              ) : (
+                <>
+                  <Droplet className="w-4 h-4" />
+                  Request Test APT
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleDisconnect}
+              className="flex-1 md:flex-none px-6 py-2.5 md:py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 rounded-full transition-all font-(family-name:--font-space-grotesk) font-medium text-sm md:text-base"
+            >
+              Disconnect Wallet
+            </button>
+          </div>
         </div>
 
         {/* Polls Created Section */}

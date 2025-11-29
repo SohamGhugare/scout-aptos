@@ -32,22 +32,22 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-4xl px-4">
-        <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-6 py-3 shadow-lg">
+      <nav className="fixed top-3 md:top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-4xl px-2 md:px-4">
+        <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-3 md:px-6 py-2 md:py-3 shadow-lg">
           <div className="flex items-center justify-between">
             {/* Logo */}
             <Link href="/" className="flex items-center">
-              <span className="text-2xl font-bold bg-linear-to-r from-green-400 to-green-500 bg-clip-text text-transparent font-(family-name:--font-space-grotesk)">
+              <span className="text-xl md:text-2xl font-bold bg-linear-to-r from-green-400 to-green-500 bg-clip-text text-transparent font-(family-name:--font-space-grotesk)">
                 Scout
               </span>
             </Link>
 
             {/* Navigation Links */}
-            <div className="flex items-center gap-6">
-              <button className="text-white hover:text-gray-300 transition-colors font-medium font-(family-name:--font-space-grotesk)">
+            <div className="flex items-center gap-2 md:gap-6">
+              <button className="hidden md:block text-white hover:text-gray-300 transition-colors font-medium font-(family-name:--font-space-grotesk)">
                 How it Works
               </button>
-              <Link href="/polls">
+              <Link href="/polls" className="hidden md:block">
                 <button className="text-white hover:text-gray-300 transition-colors font-medium font-(family-name:--font-space-grotesk)">
                   Polls
                 </button>
@@ -56,7 +56,7 @@ export default function Navbar() {
               {/* Network Selector */}
               <button
                 onClick={() => setShowNetworkModal(!showNetworkModal)}
-                className="text-xs px-3 py-1 rounded-full bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors font-(family-name:--font-space-grotesk) font-medium"
+                className="text-xs px-2 md:px-3 py-1 rounded-full bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors font-(family-name:--font-space-grotesk) font-medium"
               >
                 {network?.name || 'Testnet'}
               </button>
@@ -65,14 +65,15 @@ export default function Navbar() {
               {!connected ? (
                 <button
                   onClick={() => setShowWalletModal(true)}
-                  className="bg-white hover:bg-gray-200 text-black font-semibold px-6 py-2 rounded-full transition-all shadow-md hover:shadow-lg font-(family-name:--font-space-grotesk)"
+                  className="bg-white hover:bg-gray-200 text-black font-semibold px-3 md:px-6 py-1.5 md:py-2 rounded-full transition-all shadow-md hover:shadow-lg font-(family-name:--font-space-grotesk) text-sm md:text-base"
                 >
-                  Connect Wallet
+                  <span className="hidden md:inline">Connect Wallet</span>
+                  <span className="md:hidden">Connect</span>
                 </button>
               ) : (
                 <button
                   onClick={handleDisconnect}
-                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-black font-semibold px-6 py-2 rounded-full transition-all shadow-md hover:shadow-lg font-(family-name:--font-space-grotesk)"
+                  className="bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-black font-semibold px-3 md:px-6 py-1.5 md:py-2 rounded-full transition-all shadow-md hover:shadow-lg font-(family-name:--font-space-grotesk) text-sm md:text-base"
                 >
                   {account?.address ? formatAddress(account.address.toString()) : 'Connected'}
                 </button>

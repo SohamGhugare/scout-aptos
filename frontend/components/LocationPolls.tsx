@@ -88,13 +88,13 @@ export default function LocationPolls() {
 
   return (
     <div className="text-center">
-      <h1 className="text-4xl md:text-5xl font-bold font-[family-name:var(--font-orbitron)] text-white">
+      <h1 className="text-4xl md:text-5xl font-bold font-(family-name:--font-orbitron) text-white">
         {loading ? (
           <span className="text-gray-400">Finding polls near you...</span>
         ) : (
           <>
             <span className="text-white">10 polls found around </span>
-            <span className="bg-gradient-to-r from-green-400 to-green-500 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-green-400 to-green-500 bg-clip-text text-transparent">
               {location}
             </span>
           </>

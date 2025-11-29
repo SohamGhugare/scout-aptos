@@ -214,7 +214,8 @@ module test_addr::polls {
         // Check if poll is expired
         let poll = vector::borrow(&poll_store.polls, poll_index);
         let current_time = timestamp::now_seconds();
-        assert!(current_time < poll.expiry_time, error::invalid_state(EPOLL_EXPIRED));
+        // Convert blockchain time from microseconds to seconds
+        assert!(current_time < poll.expiry_time * 1000000, error::invalid_state(EPOLL_EXPIRED));
 
         // Check if user already voted on this poll
         if (exists<VoteStore>(voter_addr)) {
@@ -264,7 +265,7 @@ module test_addr::polls {
             poll_index,
             option_voted: option,
             stake_amount,
-            vote_time: current_time,
+            vote_time: current_time / 1000000, // Convert microseconds to seconds
         };
 
         // Store vote in voter's VoteStore

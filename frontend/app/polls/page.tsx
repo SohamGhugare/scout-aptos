@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import LocationPolls from "@/components/LocationPolls";
 import { useState } from "react";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import { X } from "lucide-react";
+import { X, CheckCircle } from "lucide-react";
 
 export default function PollsPage() {
   const { connected, account } = useWallet();
@@ -14,6 +14,7 @@ export default function PollsPage() {
   const [option2, setOption2] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   const handleCreatePoll = async () => {
     if (!connected || !account?.address) {
@@ -48,6 +49,11 @@ export default function PollsPage() {
         setOption1('');
         setOption2('');
         setShowCreateModal(false);
+
+        // Show success toast
+        setShowSuccessToast(true);
+        setTimeout(() => setShowSuccessToast(false), 3000);
+
         // TODO: Refresh polls list
       } else {
         setError(data.error || 'Failed to create poll');
@@ -148,6 +154,20 @@ export default function PollsPage() {
               >
                 {isSubmitting ? 'Creating...' : 'Create Poll'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Toast */}
+      {showSuccessToast && (
+        <div className="fixed bottom-6 right-6 z-100 animate-in slide-in-from-bottom-5 fade-in duration-300">
+          <div className="bg-green-500/20 border border-green-500/50 rounded-2xl p-4 backdrop-blur-md shadow-lg">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="w-5 h-5 text-green-400" />
+              <p className="text-white font-(family-name:--font-space-grotesk) font-medium">
+                Poll created successfully!
+              </p>
             </div>
           </div>
         </div>

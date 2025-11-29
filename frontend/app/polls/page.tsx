@@ -105,6 +105,30 @@ export default function PollsPage() {
       setTransactionHash(response.hash);
       setUploadStatus('success');
 
+      // Save poll to MongoDB
+      try {
+        await fetch('/api/polls/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: pollTitle.trim(),
+            option1: option1.trim(),
+            option2: option2.trim(),
+            latitude: latitudeU64,
+            longitude: longitudeU64,
+            pollTime: Math.floor(Date.now() / 1000),
+            expiryTime: Math.floor(expiresAt.getTime() / 1000),
+            creator: account.address.toString(),
+            index: 0,
+            transactionHash: response.hash,
+            total_option1_stake: 0,
+            total_option2_stake: 0,
+          }),
+        });
+      } catch (dbError) {
+        console.error('Error saving to database:', dbError);
+      }
+
       // Reset form
       setPollTitle('');
       setOption1('');

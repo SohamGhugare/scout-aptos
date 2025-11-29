@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
-import { Plus } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 import { calculateDistance, u64ToLatitude, u64ToLongitude } from '@/lib/utils';
 
 interface LocationPollsProps {
@@ -19,15 +19,21 @@ interface Poll {
   expiryTime: number;
   creator: string;
   index: number;
+  total_option1_stake?: number;
+  total_option2_stake?: number;
 }
 
 export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
-  const { connected, account } = useWallet();
+  const { connected, account, signAndSubmitTransaction } = useWallet();
   const [location, setLocation] = useState<string>('your location');
   const [loading, setLoading] = useState(true);
   const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [nearbyPolls, setNearbyPolls] = useState<Poll[]>([]);
   const [pollsLoading, setPollsLoading] = useState(true);
+  const [votingPoll, setVotingPoll] = useState<{ creator: string; index: number; option: number } | null>(null);
+  const [stakeAmount, setStakeAmount] = useState('');
+  const [showVoteModal, setShowVoteModal] = useState(false);
+  const [isVoting, setIsVoting] = useState(false);
 
   useEffect(() => {
     const getLocation = async () => {
@@ -115,7 +121,7 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
   // Fetch and filter nearby polls
   useEffect(() => {
     const fetchNearbyPolls = async () => {
-      if (!userCoords || !account?.address) {
+      if (!userCoords) {
         setPollsLoading(false);
         return;
       }
@@ -123,15 +129,8 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
       try {
         setPollsLoading(true);
 
-        // Fetch polls from the connected user's address
-        const response = await fetch('/api/polls/fetch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userAddress: account.address.toString(),
-          }),
-        });
-
+        // Fetch all polls from MongoDB
+        const response = await fetch('/api/polls/all');
         const data = await response.json();
 
         if (data.success && data.polls) {
@@ -165,7 +164,7 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
     };
 
     fetchNearbyPolls();
-  }, [userCoords, account]);
+  }, [userCoords]);
 
   const formatTimeRemaining = (expiryTime: number) => {
     const now = Math.floor(Date.now() / 1000);
@@ -185,6 +184,85 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
   const formatAddress = (address: string) => {
     if (!address) return '';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const handleVoteClick = (poll: Poll, option: number) => {
+    if (!connected || !account) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    // Check if user is trying to vote on their own poll
+    if (poll.creator === account.address.toString()) {
+      alert('You cannot vote on your own poll');
+      return;
+    }
+
+    setVotingPoll({ creator: poll.creator, index: poll.index, option });
+    setShowVoteModal(true);
+  };
+
+  const handleVoteSubmit = async () => {
+    if (!votingPoll || !account) return;
+
+    const stake = parseFloat(stakeAmount);
+    if (isNaN(stake) || stake <= 0) {
+      alert('Please enter a valid stake amount');
+      return;
+    }
+
+    try {
+      setIsVoting(true);
+
+      // Convert APT to Octas (1 APT = 100,000,000 Octas)
+      const stakeInOctas = Math.floor(stake * 100000000);
+
+      const response = await signAndSubmitTransaction({
+        sender: account.address,
+        data: {
+          function: `${process.env.NEXT_PUBLIC_MODULE_ADDRESS}::polls::vote_on_poll`,
+          typeArguments: [],
+          functionArguments: [
+            votingPoll.creator,
+            votingPoll.index,
+            votingPoll.option,
+            stakeInOctas,
+          ],
+        },
+      });
+
+      // Save vote to MongoDB
+      try {
+        await fetch('/api/votes/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pollCreator: votingPoll.creator,
+            pollIndex: votingPoll.index,
+            voter: account.address.toString(),
+            option: votingPoll.option,
+            stakeAmount: stakeInOctas,
+            transactionHash: response.hash,
+          }),
+        });
+      } catch (dbError) {
+        console.error('Error saving vote to database:', dbError);
+      }
+
+      // Reset and close modal
+      setShowVoteModal(false);
+      setStakeAmount('');
+      setVotingPoll(null);
+
+      // Refresh polls to update stakes
+      window.location.reload();
+      alert('Vote submitted successfully!');
+    } catch (error) {
+      console.error('Error voting:', error);
+      alert('Failed to submit vote');
+    } finally {
+      setIsVoting(false);
+    }
   };
 
   return (
@@ -240,34 +318,54 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
 
                 {/* Progress Bar with Labels */}
                 <div className="mb-6">
-                  <div className="flex h-3 rounded-full overflow-hidden shadow-lg mb-3 bg-black/30">
-                    <div
-                      className="bg-linear-to-r from-green-400 to-green-500 transition-all duration-500 ease-out"
-                      style={{ width: '50%' }}
-                    />
-                    <div
-                      className="bg-linear-to-r from-red-500 to-red-400 transition-all duration-500 ease-out"
-                      style={{ width: '50%' }}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-linear-to-r from-green-400 to-green-500 shadow-md shadow-green-500/50" />
-                      <span className="text-green-400 font-bold text-lg font-(family-name:--font-space-grotesk)">50%</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-red-400 font-bold text-lg font-(family-name:--font-space-grotesk)">50%</span>
-                      <div className="w-3 h-3 rounded-full bg-linear-to-r from-red-500 to-red-400 shadow-md shadow-red-500/50" />
-                    </div>
-                  </div>
+                  {(() => {
+                    const option1Stake = poll.total_option1_stake || 0;
+                    const option2Stake = poll.total_option2_stake || 0;
+                    const totalStake = option1Stake + option2Stake;
+                    const option1Percent = totalStake > 0 ? Math.round((option1Stake / totalStake) * 100) : 50;
+                    const option2Percent = totalStake > 0 ? 100 - option1Percent : 50;
+
+                    return (
+                      <>
+                        <div className="flex h-3 rounded-full overflow-hidden shadow-lg mb-3 bg-black/30">
+                          <div
+                            className="bg-linear-to-r from-green-400 to-green-500 transition-all duration-500 ease-out"
+                            style={{ width: `${option1Percent}%` }}
+                          />
+                          <div
+                            className="bg-linear-to-r from-red-500 to-red-400 transition-all duration-500 ease-out"
+                            style={{ width: `${option2Percent}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-linear-to-r from-green-400 to-green-500 shadow-md shadow-green-500/50" />
+                            <span className="text-green-400 font-bold text-lg font-(family-name:--font-space-grotesk)">{option1Percent}%</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-red-400 font-bold text-lg font-(family-name:--font-space-grotesk)">{option2Percent}%</span>
+                            <div className="w-3 h-3 rounded-full bg-linear-to-r from-red-500 to-red-400 shadow-md shadow-red-500/50" />
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Option Buttons */}
                 <div className="space-y-3 mb-5">
-                  <button className="w-full bg-linear-to-r from-green-500/20 to-green-600/20 hover:from-green-500/30 hover:to-green-600/30 border-2 border-green-500/50 hover:border-green-400/70 text-white font-semibold py-3.5 px-4 rounded-2xl transition-all duration-200 font-(family-name:--font-space-grotesk) shadow-lg shadow-green-500/10 hover:shadow-green-500/20 hover:scale-105 active:scale-95">
+                  <button
+                    onClick={() => handleVoteClick(poll, 1)}
+                    disabled={!connected || poll.creator === account?.address.toString()}
+                    className="w-full bg-linear-to-r from-green-500/20 to-green-600/20 hover:from-green-500/30 hover:to-green-600/30 border-2 border-green-500/50 hover:border-green-400/70 text-white font-semibold py-3.5 px-4 rounded-2xl transition-all duration-200 font-(family-name:--font-space-grotesk) shadow-lg shadow-green-500/10 hover:shadow-green-500/20 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  >
                     {poll.option1}
                   </button>
-                  <button className="w-full bg-linear-to-r from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30 border-2 border-red-500/50 hover:border-red-400/70 text-white font-semibold py-3.5 px-4 rounded-2xl transition-all duration-200 font-(family-name:--font-space-grotesk) shadow-lg shadow-red-500/10 hover:shadow-red-500/20 hover:scale-105 active:scale-95">
+                  <button
+                    onClick={() => handleVoteClick(poll, 2)}
+                    disabled={!connected || poll.creator === account?.address.toString()}
+                    className="w-full bg-linear-to-r from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30 border-2 border-red-500/50 hover:border-red-400/70 text-white font-semibold py-3.5 px-4 rounded-2xl transition-all duration-200 font-(family-name:--font-space-grotesk) shadow-lg shadow-red-500/10 hover:shadow-red-500/20 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  >
                     {poll.option2}
                   </button>
                 </div>
@@ -288,6 +386,71 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Vote Modal */}
+      {showVoteModal && votingPoll && (
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-black/90 border border-green-500/30 rounded-2xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-white font-(family-name:--font-space-grotesk)">
+                Place Your Vote
+              </h2>
+              <button
+                onClick={() => {
+                  setShowVoteModal(false);
+                  setStakeAmount('');
+                  setVotingPoll(null);
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-gray-400 text-sm font-(family-name:--font-space-grotesk) mb-2">
+                  Voting for Option {votingPoll.option}
+                </p>
+                <p className="text-green-400 font-semibold text-lg font-(family-name:--font-space-grotesk)">
+                  {votingPoll.option === 1
+                    ? nearbyPolls.find(p => p.creator === votingPoll.creator && p.index === votingPoll.index)?.option1
+                    : nearbyPolls.find(p => p.creator === votingPoll.creator && p.index === votingPoll.index)?.option2
+                  }
+                </p>
+              </div>
+
+              <div>
+                <label className="text-white font-medium font-(family-name:--font-space-grotesk) text-sm mb-2 block">
+                  Stake Amount (APT)
+                </label>
+                <input
+                  type="number"
+                  value={stakeAmount}
+                  onChange={(e) => setStakeAmount(e.target.value)}
+                  placeholder="0.1"
+                  min="0"
+                  step="0.01"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 transition-colors font-(family-name:--font-space-grotesk)"
+                />
+                <p className="text-xs text-gray-400 mt-1 font-(family-name:--font-space-grotesk)">
+                  Minimum: 0.01 APT
+                </p>
+              </div>
+
+              <button
+                onClick={handleVoteSubmit}
+                disabled={isVoting || !stakeAmount || parseFloat(stakeAmount) <= 0}
+                className="w-full bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-black font-semibold px-6 py-3 rounded-full transition-all font-(family-name:--font-space-grotesk)"
+              >
+                {isVoting ? 'Submitting Vote...' : 'Submit Vote'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

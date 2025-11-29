@@ -5,7 +5,7 @@ module test_addr::polls {
     use std::vector;
     use aptos_framework::event;
 
-    struct Poll has store, drop {
+    struct Poll has store, drop, copy {
         title: String,
         option1: String,
         option2: String,
@@ -95,5 +95,14 @@ module test_addr::polls {
             poll.expiry_time,
             poll.creator,
         )
+    }
+
+    #[view]
+    public fun get_all_polls(addr: address): vector<Poll> acquires PollStore {
+        if (!exists<PollStore>(addr)) {
+            return vector::empty<Poll>()
+        };
+        let poll_store = borrow_global<PollStore>(addr);
+        poll_store.polls
     }
 }

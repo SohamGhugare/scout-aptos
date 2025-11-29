@@ -14,25 +14,25 @@ export default function Hero() {
         {/* Powered by Aptos Badge */}
         <div className="relative inline-flex items-center gap-2 px-6 py-3 bg-black/70 backdrop-blur-md border border-green-500/40 rounded-full mb-10 shadow-[0_0_30px_rgba(34,197,94,0.2)]">
           <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-full blur-sm"></div>
-          <span className="relative text-base font-medium text-gray-200 font-[family-name:var(--font-space-grotesk)]">
+          <span className="relative text-base font-medium text-gray-200 font-(family-name:--font-space-grotesk)">
             Powered by <span className="text-green-400 font-bold">Aptos</span>
           </span>
         </div>
 
-        <h1 className="text-5xl md:text-6xl lg:text-8xl font-bold mb-8 font-[family-name:var(--font-space-grotesk)] leading-tight">
-          <span className="block text-white mb-2">Bet on Vibes</span>
+        <h1 className="text-5xl md:text-6xl lg:text-8xl font-bold mb-8 font-(family-name:--font-space-grotesk) leading-tight">
+          <span className="block text-white mb-2">Bet on Moments</span>
           <span className="block bg-gradient-to-r from-green-400 via-emerald-500 to-green-600 bg-clip-text text-transparent">
             Not on News
           </span>
         </h1>
 
-        <p className="text-gray-400 text-lg md:text-xl mb-12 max-w-2xl mx-auto font-[family-name:var(--font-space-grotesk)]">
+        <p className="text-gray-400 text-lg md:text-xl mb-12 max-w-2xl mx-auto font-(family-name:--font-space-grotesk)">
           Transform your real-world presence into valuable predictions.<br />
           Scout the ground truth.
         </p>
 
         <Link href="/polls">
-          <button className="flex items-center gap-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-black font-semibold px-10 py-5 rounded-xl transition-all font-[family-name:var(--font-space-grotesk)] text-lg group mx-auto">
+          <button className="flex items-center gap-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-black font-semibold px-10 py-5 rounded-xl transition-all font-(family-name:--font-space-grotesk) text-lg group mx-auto">
             Get Started
             <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform duration-300" />
           </button>
@@ -50,7 +50,7 @@ export default function Hero() {
             <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
             <div className="absolute inset-0 w-3 h-3 bg-green-500 rounded-full animate-ping"></div>
           </div>
-          <span className="text-base font-semibold text-gray-300 font-[family-name:var(--font-space-grotesk)]">
+          <span className="text-base font-semibold text-gray-300 font-(family-name:--font-space-grotesk)">
             Live Polls
           </span>
         </div>

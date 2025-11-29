@@ -45,7 +45,6 @@ export default function PollsPage() {
       });
 
       const data = await response.json();
-      console.log('Portfolio data received:', data);
       if (data.success) {
         setPortfolioData(data);
       }

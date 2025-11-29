@@ -84,7 +84,6 @@ export default function Portfolio() {
       });
 
       const data = await response.json();
-      console.log('Portfolio data received:', data);
       if (data.success) {
         setPortfolioData(data);
       }

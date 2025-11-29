@@ -5,8 +5,6 @@ export async function POST(request: NextRequest) {
   try {
     const { userAddress } = await request.json();
 
-    console.log('Portfolio API called with userAddress:', userAddress);
-
     if (!userAddress) {
       return NextResponse.json(
         { error: 'Missing user address' },
@@ -85,10 +83,6 @@ export async function POST(request: NextRequest) {
     // Filter out null entries
     const participatedPolls = participatedPollsData.filter((p) => p !== null);
 
-    console.log('User votes count:', userVotes.length);
-    console.log('Participated polls count:', participatedPolls.length);
-    console.log('Hosted polls count:', hostedPolls.length);
-
     // Calculate stats for hosted polls
     const hostedPollsWithStats = await Promise.all(
       hostedPolls.map(async (poll) => {
@@ -136,18 +130,11 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    const result = {
+    return NextResponse.json({
       success: true,
       hostedPolls: hostedPollsWithStats,
       participatedPolls,
-    };
-
-    console.log('Returning portfolio data:', {
-      hostedCount: hostedPollsWithStats.length,
-      participatedCount: participatedPolls.length,
     });
-
-    return NextResponse.json(result);
   } catch (error) {
     console.error('Error fetching portfolio data:', error);
     return NextResponse.json(

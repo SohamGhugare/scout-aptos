@@ -5,6 +5,8 @@ export async function POST(request: NextRequest) {
   try {
     const { userAddress } = await request.json();
 
+    console.log('Portfolio API called with userAddress:', userAddress);
+
     if (!userAddress) {
       return NextResponse.json(
         { error: 'Missing user address' },
@@ -83,6 +85,10 @@ export async function POST(request: NextRequest) {
     // Filter out null entries
     const participatedPolls = participatedPollsData.filter((p) => p !== null);
 
+    console.log('User votes count:', userVotes.length);
+    console.log('Participated polls count:', participatedPolls.length);
+    console.log('Hosted polls count:', hostedPolls.length);
+
     // Calculate stats for hosted polls
     const hostedPollsWithStats = await Promise.all(
       hostedPolls.map(async (poll) => {
@@ -100,7 +106,7 @@ export async function POST(request: NextRequest) {
         const totalOption2Stake = option2Votes.reduce((sum, v) => sum + v.stakeAmount, 0);
         const totalPool = totalOption1Stake + totalOption2Stake;
 
-        let winners = [];
+        let winners: Array<{ voter: string; stake: number; reward: number }> = [];
         if (poll.is_finalized) {
           const winningVotes = poll.winning_option === 1 ? option1Votes : option2Votes;
           const totalWinningStake = poll.winning_option === 1 ? totalOption1Stake : totalOption2Stake;
@@ -130,15 +136,22 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    return NextResponse.json({
+    const result = {
       success: true,
       hostedPolls: hostedPollsWithStats,
       participatedPolls,
+    };
+
+    console.log('Returning portfolio data:', {
+      hostedCount: hostedPollsWithStats.length,
+      participatedCount: participatedPolls.length,
     });
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error fetching portfolio data:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

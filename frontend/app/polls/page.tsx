@@ -26,13 +26,12 @@ export default function PollsPage() {
   const [portfolioData, setPortfolioData] = useState<any>(null);
   const [loadingPortfolio, setLoadingPortfolio] = useState(false);
   const [portfolioView, setPortfolioView] = useState<'hosted' | 'participated'>('hosted');
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Fetch portfolio data when switching to portfolio tab
+  // Prevent hydration mismatch
   useEffect(() => {
-    if (activeTab === 'portfolio' && connected && account) {
-      fetchPortfolioData();
-    }
-  }, [activeTab, connected, account]);
+    setIsMounted(true);
+  }, []);
 
   const fetchPortfolioData = async () => {
     if (!account) return;
@@ -46,6 +45,7 @@ export default function PollsPage() {
       });
 
       const data = await response.json();
+      console.log('Portfolio data received:', data);
       if (data.success) {
         setPortfolioData(data);
       }
@@ -55,6 +55,14 @@ export default function PollsPage() {
       setLoadingPortfolio(false);
     }
   };
+
+  // Fetch portfolio data when switching to portfolio tab
+  useEffect(() => {
+    if (activeTab === 'portfolio' && connected && account) {
+      fetchPortfolioData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, connected, account]);
 
   const formatTimestamp = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString();
@@ -295,7 +303,7 @@ export default function PollsPage() {
                                     <span className="px-2.5 py-1 bg-green-500/20 border border-green-500/50 rounded-full text-green-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
                                       Finalized
                                     </span>
-                                  ) : poll.expiryTime < Math.floor(Date.now() / 1000) ? (
+                                  ) : isMounted && poll.expiryTime < Math.floor(Date.now() / 1000) ? (
                                     <span className="px-2.5 py-1 bg-orange-500/20 border border-orange-500/50 rounded-full text-orange-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
                                       Awaiting Distribution
                                     </span>
@@ -433,7 +441,7 @@ export default function PollsPage() {
                                           Lost
                                         </span>
                                       )
-                                    ) : poll.expiryTime < Math.floor(Date.now() / 1000) ? (
+                                    ) : isMounted && poll.expiryTime < Math.floor(Date.now() / 1000) ? (
                                       <span className="px-2.5 py-1 bg-orange-500/20 border border-orange-500/50 rounded-full text-orange-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
                                         Awaiting Results
                                       </span>

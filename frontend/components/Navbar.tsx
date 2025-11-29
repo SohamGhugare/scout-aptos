@@ -2,12 +2,78 @@
 
 import Link from 'next/link';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Navbar() {
   const { connect, account, connected, wallets, network } = useWallet();
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [showNetworkModal, setShowNetworkModal] = useState(false);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [username, setUsername] = useState('');
+  const [inputUsername, setInputUsername] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [isCheckingUser, setIsCheckingUser] = useState(false);
+
+  useEffect(() => {
+    if (connected && account?.address) {
+      checkUser(account.address.toString());
+    } else {
+      setUsername('');
+    }
+  }, [connected, account]);
+
+  const checkUser = async (walletAddress: string) => {
+    try {
+      setIsCheckingUser(true);
+      const response = await fetch('/api/user/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress }),
+      });
+
+      const data = await response.json();
+
+      if (data.exists) {
+        setUsername(data.username);
+      } else {
+        setShowUsernameModal(true);
+      }
+    } catch (error) {
+      console.error('Error checking user:', error);
+    } finally {
+      setIsCheckingUser(false);
+    }
+  };
+
+  const handleCreateUser = async () => {
+    if (!account?.address) return;
+
+    setUsernameError('');
+
+    try {
+      const response = await fetch('/api/user/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: account.address.toString(),
+          username: inputUsername,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setUsername(data.username);
+        setShowUsernameModal(false);
+        setInputUsername('');
+      } else {
+        setUsernameError(data.error || 'Failed to create username');
+      }
+    } catch (error) {
+      console.error('Error creating user:', error);
+      setUsernameError('Failed to create username');
+    }
+  };
 
   const handleConnect = async (walletName: string) => {
     try {
@@ -65,7 +131,13 @@ export default function Navbar() {
               ) : (
                 <Link href="/portfolio">
                   <button className="bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-black font-semibold px-3 md:px-6 py-1.5 md:py-2 rounded-full transition-all shadow-md hover:shadow-lg font-(family-name:--font-space-grotesk) text-sm md:text-base">
-                    {account?.address ? formatAddress(account.address.toString()) : 'Connected'}
+                    {isCheckingUser ? (
+                      'Loading...'
+                    ) : username ? (
+                      `@${username}`
+                    ) : (
+                      formatAddress(account?.address?.toString() || '')
+                    )}
                   </button>
                 </Link>
               )}
@@ -157,6 +229,58 @@ export default function Navbar() {
             <p className="text-gray-400 text-xs mt-4 font-(family-name:--font-space-grotesk)">
               Note: Network switching requires page reload. Update the WalletProvider to change networks.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Username Creation Modal */}
+      {showUsernameModal && (
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-black/90 border border-green-500/30 rounded-2xl p-6 w-full max-w-md mx-4">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white font-(family-name:--font-space-grotesk) mb-2">
+                Choose Your Username
+              </h2>
+              <p className="text-gray-400 text-sm font-(family-name:--font-space-grotesk)">
+                This will be your identity on Scout
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-white font-medium font-(family-name:--font-space-grotesk) text-sm mb-2 block">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={inputUsername}
+                  onChange={(e) => setInputUsername(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
+                  placeholder="Enter username"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 transition-colors font-(family-name:--font-space-grotesk)"
+                  maxLength={20}
+                />
+                <p className="text-gray-500 text-xs mt-2 font-(family-name:--font-space-grotesk)">
+                  3-20 characters, letters, numbers, and underscores only
+                </p>
+              </div>
+
+              {usernameError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                  <p className="text-red-400 text-sm font-(family-name:--font-space-grotesk)">
+                    {usernameError}
+                  </p>
+                </div>
+              )}
+
+              <button
+                onClick={handleCreateUser}
+                disabled={!inputUsername.trim()}
+                className="w-full bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-black font-semibold px-6 py-3 rounded-full transition-all font-(family-name:--font-space-grotesk)"
+              >
+                Continue
+              </button>
+            </div>
           </div>
         </div>
       )}

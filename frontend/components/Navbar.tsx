@@ -5,7 +5,7 @@ import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import { useState } from 'react';
 
 export default function Navbar() {
-  const { connect, disconnect, account, connected, wallets, network } = useWallet();
+  const { connect, account, connected, wallets, network } = useWallet();
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [showNetworkModal, setShowNetworkModal] = useState(false);
 
@@ -15,14 +15,6 @@ export default function Navbar() {
       setShowWalletModal(false);
     } catch (error) {
       console.error('Failed to connect wallet:', error);
-    }
-  };
-
-  const handleDisconnect = () => {
-    try {
-      disconnect();
-    } catch (error) {
-      console.error('Failed to disconnect wallet:', error);
     }
   };
 
@@ -71,12 +63,11 @@ export default function Navbar() {
                   <span className="md:hidden">Connect</span>
                 </button>
               ) : (
-                <button
-                  onClick={handleDisconnect}
-                  className="bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-black font-semibold px-3 md:px-6 py-1.5 md:py-2 rounded-full transition-all shadow-md hover:shadow-lg font-(family-name:--font-space-grotesk) text-sm md:text-base"
-                >
-                  {account?.address ? formatAddress(account.address.toString()) : 'Connected'}
-                </button>
+                <Link href="/portfolio">
+                  <button className="bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-black font-semibold px-3 md:px-6 py-1.5 md:py-2 rounded-full transition-all shadow-md hover:shadow-lg font-(family-name:--font-space-grotesk) text-sm md:text-base">
+                    {account?.address ? formatAddress(account.address.toString()) : 'Connected'}
+                  </button>
+                </Link>
               )}
             </div>
           </div>
@@ -85,7 +76,7 @@ export default function Navbar() {
 
       {/* Wallet Selection Modal */}
       {showWalletModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-black/90 border border-green-500/30 rounded-2xl p-6 w-full max-w-md mx-4">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-white font-(family-name:--font-space-grotesk)">
@@ -125,7 +116,7 @@ export default function Navbar() {
 
       {/* Network Selection Modal */}
       {showNetworkModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-black/90 border border-green-500/30 rounded-2xl p-6 w-full max-w-md mx-4">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-white font-(family-name:--font-space-grotesk)">

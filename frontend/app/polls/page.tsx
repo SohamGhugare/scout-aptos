@@ -31,6 +31,28 @@ export default function PollsPage() {
       setIsSubmitting(true);
       setError('');
 
+      // Get user's current location
+      let location = null;
+      if ('geolocation' in navigator) {
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 5000,
+              maximumAge: 300000,
+            });
+          });
+
+          location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+        } catch (geoError) {
+          console.log('Could not get location:', geoError);
+          // Continue without location
+        }
+      }
+
       const response = await fetch('/api/polls/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -38,6 +60,7 @@ export default function PollsPage() {
           walletAddress: account.address.toString(),
           title: pollTitle.trim(),
           options: [option1.trim(), option2.trim()],
+          location,
         }),
       });
 

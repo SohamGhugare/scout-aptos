@@ -3,7 +3,7 @@ import clientPromise from '@/lib/mongodb';
 
 export async function POST(request: NextRequest) {
   try {
-    const { walletAddress, title, options } = await request.json();
+    const { walletAddress, title, options, location } = await request.json();
 
     // Validate input
     if (!walletAddress || !title || !options || options.length !== 2) {
@@ -40,6 +40,10 @@ export async function POST(request: NextRequest) {
         walletAddress,
         username: user.username,
       },
+      location: location ? {
+        latitude: location.latitude,
+        longitude: location.longitude,
+      } : null,
       totalVotes: 0,
       createdAt: new Date(),
       status: 'active', // active, closed

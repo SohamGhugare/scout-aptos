@@ -2,9 +2,9 @@
 
 import Navbar from "@/components/Navbar";
 import LocationPolls from "@/components/LocationPolls";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import { X, CheckCircle, ExternalLink } from "lucide-react";
+import { X, CheckCircle, ExternalLink, TrendingUp, Trophy, Coins } from "lucide-react";
 
 export default function PollsPage() {
   const { connected, account, signAndSubmitTransaction } = useWallet();
@@ -20,6 +20,49 @@ export default function PollsPage() {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<'uploading' | 'success'>('uploading');
   const [transactionHash, setTransactionHash] = useState('');
+
+  // Portfolio state
+  const [activeTab, setActiveTab] = useState<'polls' | 'portfolio'>('polls');
+  const [portfolioData, setPortfolioData] = useState<any>(null);
+  const [loadingPortfolio, setLoadingPortfolio] = useState(false);
+  const [portfolioView, setPortfolioView] = useState<'hosted' | 'participated'>('hosted');
+
+  // Fetch portfolio data when switching to portfolio tab
+  useEffect(() => {
+    if (activeTab === 'portfolio' && connected && account) {
+      fetchPortfolioData();
+    }
+  }, [activeTab, connected, account]);
+
+  const fetchPortfolioData = async () => {
+    if (!account) return;
+
+    try {
+      setLoadingPortfolio(true);
+      const response = await fetch('/api/portfolio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userAddress: account.address.toString() }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setPortfolioData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching portfolio data:', error);
+    } finally {
+      setLoadingPortfolio(false);
+    }
+  };
+
+  const formatTimestamp = (timestamp: number) => {
+    return new Date(timestamp * 1000).toLocaleString();
+  };
+
+  const formatAPT = (amount: number) => {
+    return (amount / 100000000).toFixed(4);
+  };
 
   const handleCreatePoll = async () => {
     if (!connected || !account?.address) {
@@ -150,7 +193,325 @@ export default function PollsPage() {
       <Navbar />
       <main className="pt-32 px-4">
         <div className="max-w-6xl mx-auto py-12">
-          <LocationPolls onCreateClick={() => setShowCreateModal(true)} />
+          {/* Tabs */}
+          <div className="flex gap-4 mb-8 border-b border-white/10">
+            <button
+              onClick={() => setActiveTab('polls')}
+              className={`px-6 py-3 font-semibold font-(family-name:--font-space-grotesk) transition-all ${
+                activeTab === 'polls'
+                  ? 'text-green-400 border-b-2 border-green-400'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Nearby Polls
+            </button>
+            <button
+              onClick={() => setActiveTab('portfolio')}
+              className={`px-6 py-3 font-semibold font-(family-name:--font-space-grotesk) transition-all ${
+                activeTab === 'portfolio'
+                  ? 'text-purple-400 border-b-2 border-purple-400'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              My Portfolio
+            </button>
+          </div>
+
+          {/* Polls Tab */}
+          {activeTab === 'polls' && (
+            <LocationPolls onCreateClick={() => setShowCreateModal(true)} />
+          )}
+
+          {/* Portfolio Tab */}
+          {activeTab === 'portfolio' && (
+            <div className="space-y-6">
+              {!connected ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-400 font-(family-name:--font-space-grotesk)">
+                    Please connect your wallet to view your portfolio
+                  </p>
+                </div>
+              ) : loadingPortfolio ? (
+                <div className="flex justify-center py-12">
+                  <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+                </div>
+              ) : (
+                <>
+                  {/* Portfolio View Toggle */}
+                  <div className="flex gap-4 mb-6">
+                    <button
+                      onClick={() => setPortfolioView('hosted')}
+                      className={`px-6 py-2.5 rounded-xl font-semibold font-(family-name:--font-space-grotesk) transition-all ${
+                        portfolioView === 'hosted'
+                          ? 'bg-purple-500/20 border-2 border-purple-500/50 text-purple-400'
+                          : 'bg-white/5 border-2 border-white/10 text-gray-400 hover:text-white hover:border-white/20'
+                      }`}
+                    >
+                      <TrendingUp className="w-4 h-4 inline-block mr-2" />
+                      Hosted Polls ({portfolioData?.hostedPolls?.length || 0})
+                    </button>
+                    <button
+                      onClick={() => setPortfolioView('participated')}
+                      className={`px-6 py-2.5 rounded-xl font-semibold font-(family-name:--font-space-grotesk) transition-all ${
+                        portfolioView === 'participated'
+                          ? 'bg-purple-500/20 border-2 border-purple-500/50 text-purple-400'
+                          : 'bg-white/5 border-2 border-white/10 text-gray-400 hover:text-white hover:border-white/20'
+                      }`}
+                    >
+                      <Trophy className="w-4 h-4 inline-block mr-2" />
+                      Participated Polls ({portfolioData?.participatedPolls?.length || 0})
+                    </button>
+                  </div>
+
+                  {/* Hosted Polls View */}
+                  {portfolioView === 'hosted' && (
+                    <div className="space-y-4">
+                      {portfolioData?.hostedPolls?.length === 0 ? (
+                        <div className="text-center py-12 bg-white/5 rounded-2xl border border-white/10">
+                          <p className="text-gray-400 font-(family-name:--font-space-grotesk)">
+                            You haven't hosted any polls yet
+                          </p>
+                        </div>
+                      ) : (
+                        portfolioData?.hostedPolls?.map((poll: any, index: number) => (
+                          <div
+                            key={index}
+                            className="bg-white/5 border border-purple-500/30 rounded-2xl p-6 space-y-4"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <h3 className="text-xl font-bold text-white font-(family-name:--font-space-grotesk) mb-2">
+                                  {poll.title}
+                                </h3>
+                                <div className="flex gap-2 flex-wrap">
+                                  <span className="px-2.5 py-1 bg-white/10 rounded-full text-gray-300 text-xs font-(family-name:--font-space-grotesk)">
+                                    {poll.totalVotes} votes
+                                  </span>
+                                  <span className="px-2.5 py-1 bg-purple-500/20 border border-purple-500/50 rounded-full text-purple-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
+                                    <Coins className="w-3 h-3 inline-block mr-1" />
+                                    {formatAPT(poll.totalPool)} APT Pool
+                                  </span>
+                                  {poll.is_finalized ? (
+                                    <span className="px-2.5 py-1 bg-green-500/20 border border-green-500/50 rounded-full text-green-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
+                                      Finalized
+                                    </span>
+                                  ) : poll.expiryTime < Math.floor(Date.now() / 1000) ? (
+                                    <span className="px-2.5 py-1 bg-orange-500/20 border border-orange-500/50 rounded-full text-orange-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
+                                      Awaiting Distribution
+                                    </span>
+                                  ) : (
+                                    <span className="px-2.5 py-1 bg-blue-500/20 border border-blue-500/50 rounded-full text-blue-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
+                                      Active
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="bg-white/5 rounded-xl p-4">
+                                <p className="text-gray-400 text-sm font-(family-name:--font-space-grotesk) mb-1">
+                                  Option 1: {poll.option1}
+                                </p>
+                                <p className="text-white font-semibold font-(family-name:--font-space-grotesk)">
+                                  {poll.option1Votes} votes • {formatAPT(poll.totalOption1Stake)} APT
+                                </p>
+                              </div>
+                              <div className="bg-white/5 rounded-xl p-4">
+                                <p className="text-gray-400 text-sm font-(family-name:--font-space-grotesk) mb-1">
+                                  Option 2: {poll.option2}
+                                </p>
+                                <p className="text-white font-semibold font-(family-name:--font-space-grotesk)">
+                                  {poll.option2Votes} votes • {formatAPT(poll.totalOption2Stake)} APT
+                                </p>
+                              </div>
+                            </div>
+
+                            {poll.is_finalized && (
+                              <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-xl p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <Trophy className="w-5 h-5 text-green-400" />
+                                  <h4 className="text-green-400 font-semibold font-(family-name:--font-space-grotesk)">
+                                    Winning Option: {poll.winning_option === 1 ? poll.option1 : poll.option2}
+                                  </h4>
+                                </div>
+                                <div className="space-y-2">
+                                  <p className="text-gray-300 text-sm font-(family-name:--font-space-grotesk)">
+                                    <span className="text-white font-semibold">{poll.winners.length}</span> winners received rewards
+                                  </p>
+                                  <p className="text-gray-400 text-xs font-(family-name:--font-space-grotesk)">
+                                    Finalized: {formatTimestamp(poll.finalized_at?._seconds || Math.floor(Date.now() / 1000))}
+                                  </p>
+                                  {poll.finalization_tx_hash && (
+                                    <a
+                                      href={`https://explorer.aptoslabs.com/txn/${poll.finalization_tx_hash}?network=testnet`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-green-400 hover:text-green-300 text-xs font-(family-name:--font-space-grotesk) inline-flex items-center gap-1"
+                                    >
+                                      View Transaction <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  )}
+                                </div>
+
+                                {poll.winners.length > 0 && (
+                                  <div className="mt-4 space-y-2">
+                                    <p className="text-gray-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
+                                      Top Winners:
+                                    </p>
+                                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                                      {poll.winners.slice(0, 5).map((winner: any, idx: number) => (
+                                        <div
+                                          key={idx}
+                                          className="flex items-center justify-between text-xs bg-white/5 rounded-lg p-2"
+                                        >
+                                          <span className="text-gray-300 font-(family-name:--font-space-grotesk) font-mono">
+                                            {winner.voter.slice(0, 8)}...{winner.voter.slice(-6)}
+                                          </span>
+                                          <span className="text-green-400 font-semibold font-(family-name:--font-space-grotesk)">
+                                            +{formatAPT(winner.reward)} APT
+                                          </span>
+                                        </div>
+                                      ))}
+                                      {poll.winners.length > 5 && (
+                                        <p className="text-gray-500 text-xs text-center font-(family-name:--font-space-grotesk)">
+                                          +{poll.winners.length - 5} more winners
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {/* Participated Polls View */}
+                  {portfolioView === 'participated' && (
+                    <div className="space-y-4">
+                      {portfolioData?.participatedPolls?.length === 0 ? (
+                        <div className="text-center py-12 bg-white/5 rounded-2xl border border-white/10">
+                          <p className="text-gray-400 font-(family-name:--font-space-grotesk)">
+                            You haven't participated in any polls yet
+                          </p>
+                        </div>
+                      ) : (
+                        portfolioData?.participatedPolls?.map((item: any, index: number) => {
+                          const poll = item.poll;
+                          const vote = item.vote;
+                          const won = item.won;
+                          const reward = item.reward;
+
+                          return (
+                            <div
+                              key={index}
+                              className={`bg-white/5 border rounded-2xl p-6 space-y-4 ${
+                                poll.is_finalized
+                                  ? won
+                                    ? 'border-green-500/30 bg-gradient-to-br from-green-500/5 to-transparent'
+                                    : 'border-red-500/30 bg-gradient-to-br from-red-500/5 to-transparent'
+                                  : 'border-white/10'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h3 className="text-xl font-bold text-white font-(family-name:--font-space-grotesk) mb-2">
+                                    {poll.title}
+                                  </h3>
+                                  <div className="flex gap-2 flex-wrap">
+                                    {poll.is_finalized ? (
+                                      won ? (
+                                        <span className="px-2.5 py-1 bg-green-500/20 border border-green-500/50 rounded-full text-green-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
+                                          <Trophy className="w-3 h-3 inline-block mr-1" />
+                                          You Won!
+                                        </span>
+                                      ) : (
+                                        <span className="px-2.5 py-1 bg-red-500/20 border border-red-500/50 rounded-full text-red-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
+                                          Lost
+                                        </span>
+                                      )
+                                    ) : poll.expiryTime < Math.floor(Date.now() / 1000) ? (
+                                      <span className="px-2.5 py-1 bg-orange-500/20 border border-orange-500/50 rounded-full text-orange-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
+                                        Awaiting Results
+                                      </span>
+                                    ) : (
+                                      <span className="px-2.5 py-1 bg-blue-500/20 border border-blue-500/50 rounded-full text-blue-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
+                                        Active
+                                      </span>
+                                    )}
+                                    <span className="px-2.5 py-1 bg-white/10 rounded-full text-gray-300 text-xs font-(family-name:--font-space-grotesk)">
+                                      Staked: {formatAPT(vote.stakeAmount)} APT
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="bg-white/5 rounded-xl p-4">
+                                <p className="text-gray-400 text-sm font-(family-name:--font-space-grotesk) mb-2">
+                                  Your Vote
+                                </p>
+                                <p className="text-white font-semibold font-(family-name:--font-space-grotesk) text-lg">
+                                  {vote.option === 1 ? poll.option1 : poll.option2}
+                                </p>
+                              </div>
+
+                              {poll.is_finalized && (
+                                <div className={`rounded-xl p-4 border ${
+                                  won
+                                    ? 'bg-green-500/10 border-green-500/30'
+                                    : 'bg-red-500/10 border-red-500/30'
+                                }`}>
+                                  <div className="space-y-2">
+                                    <p className={`font-semibold font-(family-name:--font-space-grotesk) ${
+                                      won ? 'text-green-400' : 'text-red-400'
+                                    }`}>
+                                      Winning Option: {poll.winning_option === 1 ? poll.option1 : poll.option2}
+                                    </p>
+                                    {won && reward > 0 && (
+                                      <div className="flex items-center gap-2">
+                                        <Coins className="w-5 h-5 text-green-400" />
+                                        <p className="text-white font-semibold font-(family-name:--font-space-grotesk) text-lg">
+                                          Reward: +{formatAPT(reward)} APT
+                                        </p>
+                                      </div>
+                                    )}
+                                    {won && (
+                                      <p className="text-gray-400 text-xs font-(family-name:--font-space-grotesk)">
+                                        Profit: +{formatAPT(reward - vote.stakeAmount)} APT ({((reward / vote.stakeAmount - 1) * 100).toFixed(2)}%)
+                                      </p>
+                                    )}
+                                    {!won && (
+                                      <p className="text-gray-400 text-xs font-(family-name:--font-space-grotesk)">
+                                        Your stake of {formatAPT(vote.stakeAmount)} APT was lost
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {vote.transactionHash && (
+                                <a
+                                  href={`https://explorer.aptoslabs.com/txn/${vote.transactionHash}?network=testnet`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-purple-400 hover:text-purple-300 text-xs font-(family-name:--font-space-grotesk) inline-flex items-center gap-1"
+                                >
+                                  View Vote Transaction <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </main>
 

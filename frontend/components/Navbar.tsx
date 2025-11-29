@@ -9,22 +9,22 @@ export default function Navbar() {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center">
-            <span className="text-2xl font-bold bg-linear-to-r from-green-400 to-green-500 bg-clip-text text-transparent font-(family-name:--font-orbitron)">
+            <span className="text-2xl font-bold bg-linear-to-r from-green-400 to-green-500 bg-clip-text text-transparent font-[family-name:var(--font-space-grotesk)]">
               Scout
             </span>
           </Link>
 
           {/* Navigation Links */}
           <div className="flex items-center gap-6">
-            <button className="text-white hover:text-gray-300 transition-colors font-medium font-(family-name:--font-inter)">
+            <button className="text-white hover:text-gray-300 transition-colors font-medium font-[family-name:var(--font-space-grotesk)]">
               How it Works
             </button>
             <Link href="/polls">
-              <button className="text-white hover:text-gray-300 transition-colors font-medium font-(family-name:--font-inter)">
+              <button className="text-white hover:text-gray-300 transition-colors font-medium font-[family-name:var(--font-space-grotesk)]">
                 Polls
               </button>
             </Link>
-            <button className="bg-white hover:bg-gray-200 text-black font-semibold px-6 py-2 rounded-full transition-all shadow-md hover:shadow-lg font-(family-name:--font-inter)">
+            <button className="bg-white hover:bg-gray-200 text-black font-semibold px-6 py-2 rounded-full transition-all shadow-md hover:shadow-lg font-[family-name:var(--font-space-grotesk)]">
               Connect Wallet
             </button>
           </div>

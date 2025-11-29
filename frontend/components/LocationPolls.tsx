@@ -21,6 +21,8 @@ interface Poll {
   index: number;
   total_option1_stake?: number;
   total_option2_stake?: number;
+  option1_votes_count?: number;
+  option2_votes_count?: number;
   is_finalized?: boolean;
   winning_option?: number;
   userVote?: {
@@ -521,20 +523,28 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
                             <div className="w-full h-full bg-gray-700/50" />
                           )}
                         </div>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-linear-to-r from-green-400 to-green-500 shadow-md shadow-green-500/50" />
-                            <div className="flex items-center gap-1.5">
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-linear-to-r from-green-400 to-green-500 shadow-md shadow-green-500/50 shrink-0" />
                               <span className="text-green-400 font-bold text-lg font-(family-name:--font-space-grotesk)">{option1Percent}%</span>
-                              <span className="text-gray-500 text-xs font-(family-name:--font-space-grotesk)">({option1APT} APT)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-red-400 font-bold text-lg font-(family-name:--font-space-grotesk)">{option2Percent}%</span>
+                              <div className="w-3 h-3 rounded-full bg-linear-to-r from-red-500 to-red-400 shadow-md shadow-red-500/50 shrink-0" />
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex justify-between items-center text-xs text-gray-500 font-(family-name:--font-space-grotesk)">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-gray-500 text-xs font-(family-name:--font-space-grotesk)">({option2APT} APT)</span>
-                              <span className="text-red-400 font-bold text-lg font-(family-name:--font-space-grotesk)">{option2Percent}%</span>
+                              <span>{poll.option1_votes_count || 0} {(poll.option1_votes_count || 0) === 1 ? 'voter' : 'voters'}</span>
+                              <span>•</span>
+                              <span className="whitespace-nowrap">{option1APT} APT</span>
                             </div>
-                            <div className="w-3 h-3 rounded-full bg-linear-to-r from-red-500 to-red-400 shadow-md shadow-red-500/50" />
+                            <div className="flex items-center gap-1.5">
+                              <span className="whitespace-nowrap">{option2APT} APT</span>
+                              <span>•</span>
+                              <span>{poll.option2_votes_count || 0} {(poll.option2_votes_count || 0) === 1 ? 'voter' : 'voters'}</span>
+                            </div>
                           </div>
                         </div>
                       </>

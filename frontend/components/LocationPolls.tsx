@@ -1,8 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useWallet } from '@aptos-labs/wallet-adapter-react';
+import { Plus } from 'lucide-react';
 
-export default function LocationPolls() {
+interface LocationPollsProps {
+  onCreateClick?: () => void;
+}
+
+export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
+  const { connected } = useWallet();
   const [location, setLocation] = useState<string>('your location');
   const [loading, setLoading] = useState(true);
 
@@ -87,19 +94,31 @@ export default function LocationPolls() {
   }, []);
 
   return (
-    <div className="text-center">
-      <h1 className="text-4xl md:text-5xl font-bold font-(family-name:--font-space-grotesk) text-white">
-        {loading ? (
-          <span className="text-gray-400">Finding polls near you...</span>
-        ) : (
-          <>
-            <span className="text-white">10 polls found around </span>
-            <span className="bg-linear-to-r from-green-400 to-green-500 bg-clip-text text-transparent">
-              {location}
-            </span>
-          </>
+    <div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold font-(family-name:--font-space-grotesk) text-white">
+          {loading ? (
+            <span className="text-gray-400">Finding polls near you...</span>
+          ) : (
+            <>
+              <span className="text-white">10 polls found around </span>
+              <span className="bg-linear-to-r from-green-400 to-green-500 bg-clip-text text-transparent">
+                {location}
+              </span>
+            </>
+          )}
+        </h1>
+        {connected && onCreateClick && (
+          <button
+            onClick={onCreateClick}
+            className="flex items-center justify-center gap-2 bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-black font-semibold px-4 md:px-6 py-2 md:py-3 rounded-full transition-all shadow-md hover:shadow-lg font-(family-name:--font-space-grotesk) shrink-0"
+          >
+            <Plus className="w-4 h-4 md:w-5 md:h-5" />
+            <span className="hidden md:inline">Create Poll</span>
+            <span className="md:hidden">Create</span>
+          </button>
         )}
-      </h1>
+      </div>
     </div>
   );
 }

@@ -12,6 +12,8 @@ export interface Poll {
   createdAt: Date;
   total_option1_stake?: number;
   total_option2_stake?: number;
+  is_finalized?: boolean;
+  winning_option?: number;
 }
 
 export interface Vote {

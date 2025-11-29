@@ -21,6 +21,8 @@ interface Poll {
   index: number;
   total_option1_stake?: number;
   total_option2_stake?: number;
+  is_finalized?: boolean;
+  winning_option?: number;
   userVote?: {
     hasVoted: boolean;
     stakeAmount?: number;

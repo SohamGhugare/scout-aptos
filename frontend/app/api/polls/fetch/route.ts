@@ -42,6 +42,10 @@ export async function POST(request: NextRequest) {
       pollTime: typeof poll.poll_time === 'string' ? parseInt(poll.poll_time) : Number(poll.poll_time),
       expiryTime: typeof poll.expiry_time === 'string' ? parseInt(poll.expiry_time) : Number(poll.expiry_time),
       creator: poll.creator,
+      total_option1_stake: typeof poll.total_option1_stake === 'string' ? parseInt(poll.total_option1_stake) : Number(poll.total_option1_stake || 0),
+      total_option2_stake: typeof poll.total_option2_stake === 'string' ? parseInt(poll.total_option2_stake) : Number(poll.total_option2_stake || 0),
+      is_finalized: poll.is_finalized || false,
+      winning_option: poll.winning_option || 0,
       index,
     }));
 

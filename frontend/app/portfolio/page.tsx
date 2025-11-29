@@ -4,7 +4,7 @@ import Navbar from '@/components/Navbar';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, RefreshCw } from 'lucide-react';
 import { Aptos, AptosConfig, Network } from '@aptos-labs/ts-sdk';
 
 export default function Portfolio() {
@@ -13,6 +13,7 @@ export default function Portfolio() {
   const [copied, setCopied] = useState(false);
   const [balance, setBalance] = useState<string | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!connected) {
@@ -20,30 +21,33 @@ export default function Portfolio() {
     }
   }, [connected, router]);
 
-  useEffect(() => {
-    const fetchBalance = async () => {
-      if (account?.address) {
-        try {
-          const config = new AptosConfig({ network: Network.TESTNET });
-          const aptos = new Aptos(config);
+  const fetchBalance = async () => {
+    if (account?.address) {
+      try {
+        setRefreshing(true);
+        const config = new AptosConfig({ network: Network.TESTNET });
+        const aptos = new Aptos(config);
 
-          const resources = await aptos.account.getAccountAPTAmount({
-            accountAddress: account.address,
-          });
+        const resources = await aptos.account.getAccountAPTAmount({
+          accountAddress: account.address,
+        });
 
-          // Convert from Octas to APT (1 APT = 100,000,000 Octas)
-          const aptBalance = (resources / 100000000).toFixed(4);
-          setBalance(aptBalance);
-        } catch (error) {
-          console.error('Error fetching balance:', error);
-          setBalance('0.0000');
-        } finally {
-          setLoadingBalance(false);
-        }
+        // Convert from Octas to APT (1 APT = 100,000,000 Octas)
+        const aptBalance = (resources / 100000000).toFixed(4);
+        setBalance(aptBalance);
+      } catch (error) {
+        console.error('Error fetching balance:', error);
+        setBalance('0.0000');
+      } finally {
+        setLoadingBalance(false);
+        setRefreshing(false);
       }
-    };
+    }
+  };
 
+  useEffect(() => {
     fetchBalance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account]);
 
   const handleDisconnect = () => {
@@ -95,9 +99,19 @@ export default function Portfolio() {
               {loadingBalance ? (
                 <span className="text-white font-(family-name:--font-space-grotesk)">Loading...</span>
               ) : (
-                <span className="text-2xl font-bold text-white font-(family-name:--font-space-grotesk)">
-                  {balance} <span className="text-lg text-green-400">APT</span>
-                </span>
+                <>
+                  <span className="text-2xl font-bold text-white font-(family-name:--font-space-grotesk)">
+                    {balance} <span className="text-lg text-green-400">APT</span>
+                  </span>
+                  <button
+                    onClick={fetchBalance}
+                    disabled={refreshing}
+                    className="p-1.5 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
+                    title="Refresh balance"
+                  >
+                    <RefreshCw className={`w-4 h-4 text-gray-400 hover:text-white ${refreshing ? 'animate-spin' : ''}`} />
+                  </button>
+                </>
               )}
             </div>
           </div>

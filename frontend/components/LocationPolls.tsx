@@ -42,6 +42,16 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
   const [voteStatus, setVoteStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [voteError, setVoteError] = useState('');
   const [voteTransactionHash, setVoteTransactionHash] = useState('');
+  const [currentTime, setCurrentTime] = useState(Math.floor(Date.now() / 1000));
+
+  // Update current time every second for countdown
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Math.floor(Date.now() / 1000));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const getLocation = async () => {
@@ -203,18 +213,19 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
   }, [userCoords, connected, account]);
 
   const formatTimeRemaining = (expiryTime: number) => {
-    const now = Math.floor(Date.now() / 1000);
-    const secondsRemaining = expiryTime - now;
+    const secondsRemaining = expiryTime - currentTime;
 
     if (secondsRemaining <= 0) return 'Expired';
 
     const days = Math.floor(secondsRemaining / (24 * 60 * 60));
     const hours = Math.floor((secondsRemaining % (24 * 60 * 60)) / (60 * 60));
     const minutes = Math.floor((secondsRemaining % (60 * 60)) / 60);
+    const seconds = secondsRemaining % 60;
 
-    if (days > 0) return `${days}d ${hours}h`;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+    if (minutes > 0) return `${minutes}m ${seconds}s`;
+    return `${seconds}s`;
   };
 
   const formatAddress = (address: string) => {

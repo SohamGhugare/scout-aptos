@@ -75,16 +75,13 @@ export default function PollsPage() {
         }
       }
 
-      // Convert coordinates to unsigned integers by adding offset
-      // Latitude range: -90 to +90, offset by 90 -> 0 to 180
-      // Longitude range: -180 to +180, offset by 180 -> 0 to 360
       const latitudeU64 = location
         ? Math.floor((location.latitude + 90) * 1000000)
-        : 90000000; // Default to equator (0 + 90 offset)
+        : 90000000; 
 
       const longitudeU64 = location
         ? Math.floor((location.longitude + 180) * 1000000)
-        : 180000000; // Default to prime meridian (0 + 180 offset)
+        : 180000000; 
 
       // Sign and submit transaction
       const response = await signAndSubmitTransaction({
@@ -96,10 +93,10 @@ export default function PollsPage() {
             pollTitle.trim(),
             option1.trim(),
             option2.trim(),
-            latitudeU64,  // u64: (latitude + 90) * 1000000
-            longitudeU64, // u64: (longitude + 180) * 1000000
-            Math.floor(Date.now() / 1000), // Created at timestamp (current time in seconds)
-            Math.floor(expiresAt.getTime() / 1000), // Expires at timestamp (future time in seconds)
+            latitudeU64, 
+            longitudeU64, 
+            Math.floor(Date.now() / 1000),
+            Math.floor(expiresAt.getTime() / 1000), 
           ],
         },
       });

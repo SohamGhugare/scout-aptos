@@ -2,8 +2,29 @@
 
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 export default function Hero() {
+  const [pollCount, setPollCount] = useState<number>(0);
+
+  useEffect(() => {
+    const fetchPollCount = async () => {
+      try {
+        const response = await fetch('/api/polls/count');
+        const data = await response.json();
+        if (data.success) {
+          setPollCount(data.count);
+        }
+      } catch (error) {
+        console.error('Error fetching poll count:', error);
+      }
+    };
+
+    fetchPollCount();
+    // Refresh count every 30 seconds
+    const interval = setInterval(fetchPollCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
   return (
     <div className="flex flex-col items-center justify-center min-h-screen text-center px-4 relative overflow-hidden">
       {/* Gradient background effects */}
@@ -44,26 +65,16 @@ export default function Hero() {
       </div>
 
       {/* Live Polls indicator at bottom */}
-      <div className="absolute bottom-8 md:bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 md:gap-3">
+      <div className="absolute bottom-8 md:bottom-12 left-1/2 -translate-x-1/2">
         <div className="flex items-center gap-2">
           <div className="relative">
             <div className="w-2.5 md:w-3 h-2.5 md:h-3 bg-green-500 rounded-full animate-pulse"></div>
             <div className="absolute inset-0 w-2.5 md:w-3 h-2.5 md:h-3 bg-green-500 rounded-full animate-ping"></div>
           </div>
           <span className="text-sm md:text-base font-semibold text-gray-300 font-(family-name:--font-space-grotesk)">
-            Live Polls
+            {pollCount > 0 ? `${pollCount} Live Polls` : 'Live Polls'}
           </span>
         </div>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2.5}
-          stroke="currentColor"
-          className="w-6 h-6 text-green-500 animate-bounce"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-        </svg>
       </div>
     </div>
   );

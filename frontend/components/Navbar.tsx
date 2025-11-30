@@ -110,9 +110,11 @@ export default function Navbar() {
 
             {/* Navigation Links */}
             <div className="flex items-center gap-2 md:gap-6">
-              <button className="hidden md:block text-white hover:text-gray-300 transition-colors font-medium font-(family-name:--font-space-grotesk)">
-                How it Works
-              </button>
+              <Link href="/how-it-works" className="hidden md:block">
+                <button className="text-white hover:text-gray-300 transition-colors font-medium font-(family-name:--font-space-grotesk)">
+                  How it Works
+                </button>
+              </Link>
               <Link href="/polls" className="hidden md:block">
                 <button className="text-white hover:text-gray-300 transition-colors font-medium font-(family-name:--font-space-grotesk)">
                   Polls

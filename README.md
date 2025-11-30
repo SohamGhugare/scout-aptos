@@ -2,6 +2,8 @@
 
 **Bet on Moments, Not on News**
 
+### Deployed Link: https://scout-aptos.vercel.app
+
 Scout is a location-based permissionless prediction market platform built on Aptos blockchain. Create predictions about real-world events, let people bet with APT tokens, and earn rewards when your predictions gain traction.
 
 ## 🌟 What is Scout?

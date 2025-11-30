@@ -79,6 +79,50 @@ export default function Portfolio() {
 
     try {
       setLoadingPortfolio(true);
+
+      /* ==========================================
+       * BLOCKCHAIN INTEGRATION (NOT HOOKED UP)
+       * ==========================================
+       * Below is how to fetch user portfolio directly from blockchain.
+       * This would replace the MongoDB API call.
+       *
+       * import { Aptos, AptosConfig, Network } from '@aptos-labs/ts-sdk';
+       *
+       * const config = new AptosConfig({ network: Network.TESTNET });
+       * const aptos = new Aptos(config);
+       * const MODULE_ADDRESS = process.env.NEXT_PUBLIC_MODULE_ADDRESS!;
+       *
+       * // 1. Fetch all user votes
+       * const userVotes = await aptos.view({
+       *   payload: {
+       *     function: `${MODULE_ADDRESS}::polls::get_user_votes`,
+       *     functionArguments: [account.address.toString()],
+       *   },
+       * });
+       *
+       * // 2. For each vote, fetch the corresponding poll details
+       * const pollsWithDetails = await Promise.all(
+       *   userVotes.map(async (vote) => {
+       *     const pollData = await aptos.view({
+       *       payload: {
+       *         function: `${MODULE_ADDRESS}::polls::get_poll_with_stakes`,
+       *         functionArguments: [vote.poll_creator, vote.poll_index],
+       *       },
+       *     });
+       *     return { vote, poll: pollData };
+       *   })
+       * );
+       *
+       * // 3. Calculate statistics
+       * const totalStaked = userVotes.reduce((sum, vote) => sum + vote.stake_amount, 0);
+       * const activeBets = pollsWithDetails.filter(p => !p.poll.is_finalized).length;
+       * const completedBets = pollsWithDetails.filter(p => p.poll.is_finalized).length;
+       * const wonBets = pollsWithDetails.filter(p =>
+       *   p.poll.is_finalized && p.vote.option_voted === p.poll.winning_option
+       * ).length;
+       *
+       * ========================================== */
+
       const response = await fetch('/api/portfolio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

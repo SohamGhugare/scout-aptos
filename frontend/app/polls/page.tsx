@@ -131,7 +131,35 @@ export default function PollsPage() {
 
       const longitudeU64 = location
         ? Math.floor((location.longitude + 180) * 1000000)
-        : 180000000; 
+        : 180000000;
+
+      /* ==========================================
+       * BLOCKCHAIN INTEGRATION - CREATE POLL
+       * ==========================================
+       * This is the core blockchain transaction that creates a poll on-chain.
+       * The transaction calls the create_poll entry function in the Move contract.
+       *
+       * Move Function Signature:
+       * public entry fun create_poll(
+       *   account: signer,
+       *   title: String,
+       *   option1: String,
+       *   option2: String,
+       *   latitude: u64,
+       *   longitude: u64,
+       *   poll_time: u64,
+       *   expiry_time: u64,
+       * )
+       *
+       * What happens on-chain:
+       * 1. Creates a Poll struct with the provided details
+       * 2. Initializes PollStore if it doesn't exist for the creator
+       * 3. Adds the poll to the creator's poll vector
+       * 4. Emits a PollCreated event
+       *
+       * After the transaction succeeds, we cache the poll in MongoDB
+       * for faster querying and aggregation (see below).
+       * ========================================== */
 
       // Sign and submit transaction
       const response = await signAndSubmitTransaction({
@@ -143,10 +171,10 @@ export default function PollsPage() {
             pollTitle.trim(),
             option1.trim(),
             option2.trim(),
-            latitudeU64, 
-            longitudeU64, 
+            latitudeU64,
+            longitudeU64,
             Math.floor(Date.now() / 1000),
-            Math.floor(expiresAt.getTime() / 1000), 
+            Math.floor(expiresAt.getTime() / 1000),
           ],
         },
       });

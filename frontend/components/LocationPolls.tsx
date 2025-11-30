@@ -165,6 +165,50 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
         const response = await fetch('/api/polls/all');
         const data = await response.json();
 
+        /* ==========================================
+         * BLOCKCHAIN INTEGRATION (NOT HOOKED UP)
+         * ==========================================
+         * Below is an example of how to fetch polls directly from the Aptos blockchain
+         * using the get_all_polls view function. This is currently commented out
+         * as we're using MongoDB for better performance and off-chain caching.
+         *
+         * import { Aptos, AptosConfig, Network } from '@aptos-labs/ts-sdk';
+         *
+         * const config = new AptosConfig({ network: Network.TESTNET });
+         * const aptos = new Aptos(config);
+         * const MODULE_ADDRESS = process.env.NEXT_PUBLIC_MODULE_ADDRESS!;
+         *
+         * // Fetch all polls from blockchain for a specific creator
+         * const pollsFromBlockchain = await aptos.view({
+         *   payload: {
+         *     function: `${MODULE_ADDRESS}::polls::get_all_polls`,
+         *     functionArguments: [creatorAddress], // Address of the poll creator
+         *   },
+         * });
+         *
+         * // The response will be an array of Poll structs with this structure:
+         * // {
+         * //   title: string,
+         * //   option1: string,
+         * //   option2: string,
+         * //   latitude: u64,
+         * //   longitude: u64,
+         * //   poll_time: u64,
+         * //   expiry_time: u64,
+         * //   creator: address,
+         * //   total_option1_stake: u64,
+         * //   total_option2_stake: u64,
+         * //   is_finalized: bool,
+         * //   winning_option: u8,
+         * // }
+         *
+         * // Note: To get ALL polls from ALL creators, you would need to:
+         * // 1. Maintain an off-chain index of all poll creator addresses
+         * // 2. Call get_all_polls for each creator
+         * // 3. Combine the results
+         * // This is why MongoDB is used for aggregation and querying
+         * ========================================== */
+
         if (data.success && data.polls) {
           // Filter polls within 100m radius
           const filtered = data.polls.filter((poll: Poll) => {
@@ -192,6 +236,33 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
 
           // Check if user has voted on each poll
           if (connected && account) {
+            /* ==========================================
+             * BLOCKCHAIN INTEGRATION (NOT HOOKED UP)
+             * ==========================================
+             * Below is how to fetch user votes directly from blockchain
+             * using the get_user_votes view function.
+             *
+             * // Fetch all votes for the current user from blockchain
+             * const userVotesFromBlockchain = await aptos.view({
+             *   payload: {
+             *     function: `${MODULE_ADDRESS}::polls::get_user_votes`,
+             *     functionArguments: [account.address.toString()],
+             *   },
+             * });
+             *
+             * // Returns array of Vote structs:
+             * // {
+             * //   voter: address,
+             * //   poll_creator: address,
+             * //   poll_index: u64,
+             * //   option_voted: u8,
+             * //   stake_amount: u64,
+             * //   vote_time: u64,
+             * // }
+             *
+             * // Then match votes to polls by comparing poll_creator and poll_index
+             * ========================================== */
+
             const pollsWithVotes = await Promise.all(
               filtered.map(async (poll: Poll) => {
                 try {
@@ -287,6 +358,33 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
 
       // Convert APT to Octas (1 APT = 100,000,000 Octas)
       const stakeInOctas = Math.floor(stake * 100000000);
+
+      /* ==========================================
+       * BLOCKCHAIN INTEGRATION - VOTE ON POLL
+       * ==========================================
+       * This transaction stakes APT tokens on a poll option.
+       * The transaction calls the vote_on_poll entry function.
+       *
+       * Move Function Signature:
+       * public entry fun vote_on_poll(
+       *   voter: &signer,
+       *   poll_creator: address,
+       *   poll_index: u64,
+       *   option: u8,
+       *   stake_amount: u64,
+       * )
+       *
+       * What happens on-chain:
+       * 1. Validates the poll exists and is not expired
+       * 2. Checks user hasn't already voted on this poll
+       * 3. Transfers APT from voter to poll creator (escrow)
+       * 4. Updates poll's total stake for the chosen option
+       * 5. Records voter and stake in PollVoters for reward distribution
+       * 6. Creates a Vote record in voter's VoteStore
+       * 7. Emits a VoteCast event
+       *
+       * The vote is then cached in MongoDB for faster lookups.
+       * ========================================== */
 
       const response = await signAndSubmitTransaction({
         sender: account.address,
@@ -391,6 +489,34 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
     try {
       setEndPollStatus('submitting');
       setEndPollError('');
+
+      /* ==========================================
+       * BLOCKCHAIN INTEGRATION - FINALIZE POLL
+       * ==========================================
+       * This transaction finalizes a poll and distributes rewards to winners.
+       * Only the poll creator can call this function.
+       *
+       * Move Function Signature:
+       * public entry fun finalize_poll_and_distribute(
+       *   host: &signer,
+       *   poll_index: u64,
+       *   winning_option: u8,
+       * )
+       *
+       * What happens on-chain:
+       * 1. Validates the caller is the poll creator
+       * 2. Checks the poll hasn't already been finalized
+       * 3. Marks the poll as finalized with the winning option
+       * 4. Calculates the total pool (option1_stake + option2_stake)
+       * 5. Retrieves all winners (voters who chose the winning option)
+       * 6. Distributes rewards proportionally:
+       *    reward = (winner_stake × total_pool) / total_winning_stake
+       * 7. Transfers APT from poll creator to each winner
+       * 8. Emits PollFinalized and RewardDistributed events
+       *
+       * Note: If no one voted for the winning option, the creator keeps all funds.
+       * The finalization is then cached in MongoDB.
+       * ========================================== */
 
       const response = await signAndSubmitTransaction({
         sender: account.address,

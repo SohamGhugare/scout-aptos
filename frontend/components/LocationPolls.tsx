@@ -572,21 +572,23 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
                   <div className="relative group/button">
                     <button
                       onClick={() => handleVoteClick(poll, 1)}
-                      disabled={!connected || poll.creator === account?.address.toString() || poll.userVote?.hasVoted || poll.expiryTime < currentTime}
+                      disabled={!connected || poll.creator === account?.address.toString() || poll.userVote?.hasVoted || poll.expiryTime < currentTime || poll.is_finalized}
                       className="w-full bg-linear-to-r from-green-500/20 to-green-600/20 hover:from-green-500/30 hover:to-green-600/30 border-2 border-green-500/50 hover:border-green-400/70 text-white font-semibold py-3.5 px-4 rounded-2xl transition-all duration-200 font-(family-name:--font-space-grotesk) shadow-lg shadow-green-500/10 hover:shadow-green-500/20 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                     >
                       {poll.option1}
                     </button>
-                    {(poll.creator === account?.address.toString() || poll.userVote?.hasVoted || poll.expiryTime < currentTime) && (
+                    {(poll.creator === account?.address.toString() || poll.userVote?.hasVoted || poll.expiryTime < currentTime || poll.is_finalized) && (
                       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-black/90 border border-white/20 rounded-lg opacity-0 group-hover/button:opacity-100 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-10">
                         <p className="text-white text-xs font-(family-name:--font-space-grotesk)">
                           {poll.creator === account?.address.toString()
                             ? "You own this poll"
-                            : poll.expiryTime < currentTime
-                              ? "Poll has expired"
-                              : poll.userVote?.stakeAmount
-                                ? `Already staked ${(poll.userVote.stakeAmount / 100000000).toFixed(2)} APT`
-                                : "Already voted"
+                            : poll.is_finalized
+                              ? "Poll has ended"
+                              : poll.expiryTime < currentTime
+                                ? "Poll has expired"
+                                : poll.userVote?.stakeAmount
+                                  ? `Already staked ${(poll.userVote.stakeAmount / 100000000).toFixed(2)} APT`
+                                  : "Already voted"
                           }
                         </p>
                         <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-black/90"></div>
@@ -596,21 +598,23 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
                   <div className="relative group/button">
                     <button
                       onClick={() => handleVoteClick(poll, 2)}
-                      disabled={!connected || poll.creator === account?.address.toString() || poll.userVote?.hasVoted || poll.expiryTime < currentTime}
+                      disabled={!connected || poll.creator === account?.address.toString() || poll.userVote?.hasVoted || poll.expiryTime < currentTime || poll.is_finalized}
                       className="w-full bg-linear-to-r from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30 border-2 border-red-500/50 hover:border-red-400/70 text-white font-semibold py-3.5 px-4 rounded-2xl transition-all duration-200 font-(family-name:--font-space-grotesk) shadow-lg shadow-red-500/10 hover:shadow-red-500/20 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                     >
                       {poll.option2}
                     </button>
-                    {(poll.creator === account?.address.toString() || poll.userVote?.hasVoted || poll.expiryTime < currentTime) && (
+                    {(poll.creator === account?.address.toString() || poll.userVote?.hasVoted || poll.expiryTime < currentTime || poll.is_finalized) && (
                       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-black/90 border border-white/20 rounded-lg opacity-0 group-hover/button:opacity-100 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-10">
                         <p className="text-white text-xs font-(family-name:--font-space-grotesk)">
                           {poll.creator === account?.address.toString()
                             ? "You own this poll"
-                            : poll.expiryTime < currentTime
-                              ? "Poll has expired"
-                              : poll.userVote?.stakeAmount
-                                ? `Already staked ${(poll.userVote.stakeAmount / 100000000).toFixed(2)} APT`
-                                : "Already voted"
+                            : poll.is_finalized
+                              ? "Poll has ended"
+                              : poll.expiryTime < currentTime
+                                ? "Poll has expired"
+                                : poll.userVote?.stakeAmount
+                                  ? `Already staked ${(poll.userVote.stakeAmount / 100000000).toFixed(2)} APT`
+                                  : "Already voted"
                           }
                         </p>
                         <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-black/90"></div>

@@ -179,14 +179,15 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
               pollLon
             );
 
-            // Filter out expired polls UNLESS user is the creator (they need to see it to distribute rewards)
-            // Also filter out finalized polls entirely
+            // Show all polls within 100km: active, expired, and finalized
+            // Creators can always see their expired polls to distribute rewards
             const now = Math.floor(Date.now() / 1000);
             const isActive = poll.expiryTime >= now;
             const isCreator = connected && account && poll.creator === account.address.toString();
             const isFinalized = poll.is_finalized;
 
-            return distance <= 100 && (isActive || isCreator) && !isFinalized;
+            // Show poll if it's within distance and either active, finalized, or user is the creator
+            return distance <= 100 && (isActive || isFinalized || isCreator);
           });
 
           // Check if user has voted on each poll
@@ -485,11 +486,15 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
                   <h3 className="text-xl md:text-2xl font-bold text-white font-(family-name:--font-space-grotesk) leading-tight">
                     {poll.title}
                   </h3>
-                  {poll.expiryTime < currentTime && !poll.is_finalized && (
+                  {poll.is_finalized ? (
+                    <span className="shrink-0 px-2.5 py-1 bg-gray-500/20 border border-gray-500/50 rounded-full text-gray-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
+                      POLL ENDED
+                    </span>
+                  ) : poll.expiryTime < currentTime ? (
                     <span className="shrink-0 px-2.5 py-1 bg-red-500/20 border border-red-500/50 rounded-full text-red-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
                       EXPIRED
                     </span>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Progress Bar with Labels */}
@@ -528,8 +533,18 @@ export default function LocationPolls({ onCreateClick }: LocationPollsProps) {
                             <div className="flex items-center gap-2">
                               <div className="w-3 h-3 rounded-full bg-linear-to-r from-green-400 to-green-500 shadow-md shadow-green-500/50 shrink-0" />
                               <span className="text-green-400 font-bold text-lg font-(family-name:--font-space-grotesk)">{option1Percent}%</span>
+                              {poll.is_finalized && poll.winning_option === 1 && (
+                                <span className="ml-1 px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/50 rounded-full text-yellow-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
+                                  WINNER
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
+                              {poll.is_finalized && poll.winning_option === 2 && (
+                                <span className="mr-1 px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/50 rounded-full text-yellow-400 text-xs font-semibold font-(family-name:--font-space-grotesk)">
+                                  WINNER
+                                </span>
+                              )}
                               <span className="text-red-400 font-bold text-lg font-(family-name:--font-space-grotesk)">{option2Percent}%</span>
                               <div className="w-3 h-3 rounded-full bg-linear-to-r from-red-500 to-red-400 shadow-md shadow-red-500/50 shrink-0" />
                             </div>
